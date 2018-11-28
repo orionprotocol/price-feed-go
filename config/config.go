@@ -8,6 +8,7 @@ import (
 
 	"github.com/nkryuchkov/tradingbot/api"
 	"github.com/nkryuchkov/tradingbot/logger"
+	"github.com/nkryuchkov/tradingbot/storage"
 
 	"github.com/pkg/errors"
 )
@@ -18,11 +19,12 @@ const (
 
 // Config represents an application configuration.
 type Config struct {
-	Logger *logger.Config `json:"logger"`
-	API    *api.Config    `json:"api"`
+	Logger  *logger.Config  `json:"logger"`
+	API     *api.Config     `json:"api"`
+	Storage *storage.Config `json:"storage"`
 }
 
-// FromFile reads a config from the file specified in `filename	.
+// FromFile reads a config from the file specified in `filename`.
 func FromFile() (*Config, error) {
 	configFilename := filename
 	if len(os.Args) > 1 {
