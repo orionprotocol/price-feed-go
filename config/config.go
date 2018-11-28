@@ -48,7 +48,7 @@ func FromFile() (*Config, error) {
 	}()
 
 	var config Config
-	if err := json.NewDecoder(configFile).Decode(&config); err != nil {
+	if err = json.NewDecoder(configFile).Decode(&config); err != nil {
 		return nil, errors.Wrapf(err, "could not read config file")
 	}
 
