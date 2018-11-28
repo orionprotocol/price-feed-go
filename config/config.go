@@ -6,7 +6,9 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/nkryuchkov/tradingbot/api"
 	"github.com/nkryuchkov/tradingbot/logger"
+
 	"github.com/pkg/errors"
 )
 
@@ -16,6 +18,7 @@ const (
 
 type Config struct {
 	Logger *logger.Config `json:"logger"`
+	API    *api.Config    `json:"api"`
 }
 
 func FromFile() (*Config, error) {
