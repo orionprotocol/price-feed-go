@@ -16,11 +16,13 @@ const (
 	filename = "config.json"
 )
 
+// Config represents an application configuration.
 type Config struct {
 	Logger *logger.Config `json:"logger"`
 	API    *api.Config    `json:"api"`
 }
 
+// FromFile reads a config from the file specified in `filename	.
 func FromFile() (*Config, error) {
 	configFilename := filename
 	if len(os.Args) > 1 {

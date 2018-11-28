@@ -7,15 +7,18 @@ import (
 	"github.com/nkryuchkov/tradingbot/logger"
 )
 
+// Config represents an API configuration.
 type Config struct {
 	Port int `json:"port"`
 }
 
+// API represents a REST API server instance.
 type API struct {
 	config *Config
 	log    *logger.Logger
 }
 
+// New returns a new API instance.
 func New(config *Config, log *logger.Logger) *API {
 	api := &API{
 		config: config,
@@ -25,6 +28,7 @@ func New(config *Config, log *logger.Logger) *API {
 	return api
 }
 
+// Serve starts the API server
 func (api *API) Serve() error {
 	api.log.Infof("Starting API")
 
