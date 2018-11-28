@@ -1,0 +1,12 @@
+{
+  "logger": {
+    "level": "debug",
+    "to_stdout": true,
+    "to_file": false,
+    "file_path": "tradingbot.log"
+  },
+
+  "api": {
+    "port": 8080
+  }
+}
