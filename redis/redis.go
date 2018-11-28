@@ -15,7 +15,7 @@ type Client struct {
 	client *redis.Client
 }
 
-func NewRedisClient(cfg *Config) *Client {
+func New(cfg *Config) *Client {
 	client := redis.NewClient(&redis.Options{
 		Addr:     cfg.Endpoint,
 		Password: cfg.Password,
