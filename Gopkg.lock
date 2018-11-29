@@ -2,6 +2,30 @@
 
 
 [[projects]]
+  digest = "1:6d3bb24f40e11d29c5f7be819aa7b3b05a0f42033aa2f806ff18a4161b538671"
+  name = "github.com/adshao/go-binance"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "6cf0e802b22a56ff09523536cf27fbb666180a98"
+  version = "1.1.2"
+
+[[projects]]
+  digest = "1:b520b55fc1146c5b0eea03b07233f7a3d4a9be985c037c91ea6b82ecb81bd521"
+  name = "github.com/bitly/go-simplejson"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "aabad6e819789e569bd6aabf444c935aa9ba1e44"
+  version = "v0.5.0"
+
+[[projects]]
+  digest = "1:7b5c6e2eeaa9ae5907c391a91c132abfd5c9e8a784a341b5625e750c67e6825d"
+  name = "github.com/gorilla/websocket"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "66b9c49e59c6c48f0ffce28c2d8b8a5678502c6d"
+  version = "v1.4.0"
+
+[[projects]]
   digest = "1:0a69a1c0db3591fcefb47f115b224592c8dfa4368b7ba9fae509d5e16cdc95c8"
   name = "github.com/konsorten/go-windows-terminal-sequences"
   packages = ["."]
@@ -70,6 +94,7 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
+    "github.com/adshao/go-binance",
     "github.com/pkg/errors",
     "github.com/sirupsen/logrus",
     "gopkg.in/redis.v3",
