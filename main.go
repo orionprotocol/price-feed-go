@@ -31,9 +31,8 @@ func main() {
 	pong, err := database.Check()
 	if err != nil {
 		l.Fatalf("Can't establish connection to database: %v", err)
-	} else {
-		l.Infof("Backend check reply: %v", pong)
 	}
+	l.Infof("Database check reply: %v", pong)
 
 	server := api.New(cfg.API, l, database)
 
