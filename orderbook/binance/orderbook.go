@@ -1,7 +1,9 @@
 package binance
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
 
 	"github.com/adshao/go-binance"
 )
@@ -14,6 +16,7 @@ type OrderBook struct {
 	AllMarketTickersC     chan binance.WsAllMarketsStatEvent
 	PartialBookDepthsC    chan *binance.WsPartialDepthEvent
 	DiffDepthsC           chan *binance.WsDepthEvent
+	StopC                 chan struct{}
 	stops                 []chan struct{}
 	dones                 []chan struct{}
 }
@@ -27,11 +30,8 @@ func New() *OrderBook {
 		AllMarketTickersC:     make(chan binance.WsAllMarketsStatEvent),
 		PartialBookDepthsC:    make(chan *binance.WsPartialDepthEvent),
 		DiffDepthsC:           make(chan *binance.WsDepthEvent),
+		StopC:                 make(chan struct{}),
 	}
-}
-
-func errHandler(err error) {
-	fmt.Println(err)
 }
 
 func (b *OrderBook) AggTrades(symbol string) error {
@@ -148,4 +148,37 @@ func (b *OrderBook) StopAll() {
 	for _, c := range b.dones {
 		<-c
 	}
+
+	b.StopC <- struct{}{}
+}
+
+func errHandler(err error) {
+	fmt.Println(err)
+}
+
+func GetSymbols() ([]string, error) {
+	resp, err := http.Get("https: //api.binance.com/api/v3/ticker/price")
+	if err != nil {
+		return nil, err
+	}
+
+	var data []struct {
+		Symbol string `json:"symbol"`
+		Price  string `json:"price"`
+	}
+
+	decoder := json.NewDecoder(resp.Body)
+
+	err = decoder.Decode(&data)
+	if err != nil {
+		return nil, err
+	}
+
+	symbols := make([]string, len(data))
+
+	for i, item := range data {
+		symbols[i] = item.Symbol
+	}
+
+	return symbols, nil
 }

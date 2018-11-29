@@ -25,6 +25,7 @@ func New(cfg *Config) *Client {
 		DB:       cfg.Database,
 		PoolSize: cfg.PoolSize,
 	})
+
 	return &Client{
 		client: client,
 	}
@@ -33,4 +34,11 @@ func New(cfg *Config) *Client {
 // Check sends a ping to the database.
 func (c *Client) Check() (string, error) {
 	return c.client.Ping().Result()
+}
+
+func (c *Client) Store(key string, score float64, val interface{}) {
+	c.client.ZAdd(key, redis.Z{
+		Score:  score,
+		Member: val,
+	})
 }
