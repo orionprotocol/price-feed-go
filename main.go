@@ -6,12 +6,12 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/nkryuchkov/tradingbot/orderbook/binance"
-
-	"github.com/nkryuchkov/tradingbot/api"
 	"github.com/nkryuchkov/tradingbot/config"
 	"github.com/nkryuchkov/tradingbot/logger"
 	"github.com/nkryuchkov/tradingbot/storage"
+
+	"github.com/nkryuchkov/tradingbot/api"
+	"github.com/nkryuchkov/tradingbot/orderbook/binance"
 )
 
 var (
@@ -51,31 +51,55 @@ func main() {
 		l.Fatalf("Couldn't get symbols: %v\n", err)
 	}
 
+	log.Printf("Got %v symbols", len(symbols))
 	binanceOrderBook := binance.New()
-	for _, symbol := range symbols {
-		err := binanceOrderBook.DiffDepths(symbol)
-		if err != nil {
-			l.Printf("Couldn't get diff depths on symbol %s: %v\n", symbol, err)
-		}
-	}
 
-	for {
-		go func() {
+	wsStopC := make(chan struct{})
+
+	go func() {
+		wsTicker := time.NewTicker(30 * time.Millisecond)
+
+		for {
+			wsTimeoutTimer := time.NewTimer(wsTimeout)
+
+			go func() {
+				for {
+					select {
+					case <-binanceOrderBook.StopC:
+						return
+					case depth := <-binanceOrderBook.DiffDepthsC:
+						database.Store("depth", float64(time.Now().Unix()), depth)
+					}
+				}
+			}()
+
 			for {
 				select {
-				case <-binanceOrderBook.StopC:
+				case <-quit:
+					binanceOrderBook.StopAll()
+					wsStopC <- struct{}{}
 					return
-				case depth := <-binanceOrderBook.DiffDepthsC:
-					database.Store("depth", float64(time.Now().Unix()), depth)
+				case <-wsTicker.C:
+					continue
+				case <-wsTimeoutTimer.C:
+					break
 				}
 			}
-		}()
 
-		time.Sleep(wsTimeout)
+			binanceOrderBook.StopAll()
+		}
+	}()
 
-		binanceOrderBook.StopAll()
+	for _, symbol := range symbols {
+		go func(symbol string) {
+			err := binanceOrderBook.DiffDepths(symbol)
+			if err != nil {
+				l.Printf("Couldn't get diff depths on symbol %s: %v\n", symbol, err)
+			}
+		}(symbol)
 	}
 
+	log.Println("before quit")
 	server := api.New(cfg.API, l, database)
 
 	go func() {
@@ -84,7 +108,5 @@ func main() {
 		}
 	}()
 
-	<-quit
-
-	binanceOrderBook.StopAll()
+	<-wsStopC
 }

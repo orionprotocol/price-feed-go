@@ -2,7 +2,7 @@ package binance
 
 import (
 	"encoding/json"
-	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/adshao/go-binance"
@@ -29,7 +29,7 @@ func New() *OrderBook {
 		AllMarketMiniTickersC: make(chan binance.WsAllMiniMarketsStatEvent),
 		AllMarketTickersC:     make(chan binance.WsAllMarketsStatEvent),
 		PartialBookDepthsC:    make(chan *binance.WsPartialDepthEvent),
-		DiffDepthsC:           make(chan *binance.WsDepthEvent),
+		DiffDepthsC:           make(chan *binance.WsDepthEvent, 10000),
 		StopC:                 make(chan struct{}),
 	}
 }
@@ -153,11 +153,11 @@ func (b *OrderBook) StopAll() {
 }
 
 func errHandler(err error) {
-	fmt.Println(err)
+	log.Println(err)
 }
 
 func GetSymbols() ([]string, error) {
-	resp, err := http.Get("https: //api.binance.com/api/v3/ticker/price")
+	resp, err := http.Get("https://api.binance.com/api/v3/ticker/price")
 	if err != nil {
 		return nil, err
 	}
