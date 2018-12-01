@@ -35,7 +35,7 @@ func New(config *Config, log *logger.Logger, storage *storage.Client) *API {
 func (api *API) Serve() error {
 	api.log.Infof("Starting API")
 
-	http.HandleFunc("/", api.handleRequest)
+	http.HandleFunc("/orderBook", api.handleOrderBookRequest)
 
 	if err := http.ListenAndServe(":"+strconv.Itoa(api.config.Port), nil); err != nil {
 		return err
@@ -44,7 +44,7 @@ func (api *API) Serve() error {
 	return nil
 }
 
-func (api *API) handleRequest(w http.ResponseWriter, r *http.Request) {
+func (api *API) handleOrderBookRequest(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Not implemented yet", http.StatusMethodNotAllowed)
 	return
 }

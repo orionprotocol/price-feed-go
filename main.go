@@ -43,12 +43,12 @@ func main() {
 		}
 	}()
 
-	binanaceExchange, err := binance.New(cfg.Binance, l, database, quit)
+	binanceExchange, err := binance.New(cfg.Binance, l, database, quit)
 	if err != nil {
 		l.Fatalf("Could not connect to Binanace: %v", err)
 	}
 
-	wsStopC := binanaceExchange.StartOrderBookWorker()
+	wsStopC := binanceExchange.StartOrderBookWorker()
 
 	<-wsStopC
 }

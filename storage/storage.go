@@ -1,6 +1,10 @@
 package storage
 
 import (
+	"math/big"
+	"strconv"
+	"strings"
+
 	"gopkg.in/redis.v3"
 )
 
@@ -42,4 +46,44 @@ func (c *Client) Store(key string, score float64, val interface{}) {
 		Score:  score,
 		Member: val,
 	})
+}
+
+// FormatKey formats keys using given args separating them with a colon.
+func (c *Client) FormatKey(args ...interface{}) string {
+	s := make([]string, len(args))
+	for i, v := range args {
+		switch v.(type) {
+		case string:
+			s[i] = v.(string)
+		case int64:
+			s[i] = strconv.FormatInt(v.(int64), 10)
+		case uint64:
+			s[i] = strconv.FormatUint(v.(uint64), 10)
+		case float64:
+			s[i] = strconv.FormatFloat(v.(float64), 'f', 0, 64)
+		case bool:
+			if v.(bool) {
+				s[i] = "1"
+			} else {
+				s[i] = "0"
+			}
+		case *big.Int:
+			n := v.(*big.Int)
+			if n != nil {
+				s[i] = n.String()
+			} else {
+				s[i] = "0"
+			}
+		case *big.Rat:
+			x := v.(*big.Rat)
+			if x != nil {
+				s[i] = x.FloatString(9)
+			} else {
+				s[i] = "0"
+			}
+		default:
+			panic("Invalid type specified for conversion")
+		}
+	}
+	return strings.Join(s, ":")
 }
