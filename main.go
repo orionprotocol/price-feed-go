@@ -4,18 +4,12 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"time"
-
-	"github.com/nkryuchkov/tradingbot/config"
-	"github.com/nkryuchkov/tradingbot/logger"
-	"github.com/nkryuchkov/tradingbot/storage"
 
 	"github.com/nkryuchkov/tradingbot/api"
-	"github.com/nkryuchkov/tradingbot/orderbook/binance"
-)
-
-var (
-	wsTimeoutStr = "12h"
+	"github.com/nkryuchkov/tradingbot/config"
+	"github.com/nkryuchkov/tradingbot/exchanges/binance"
+	"github.com/nkryuchkov/tradingbot/logger"
+	"github.com/nkryuchkov/tradingbot/storage"
 )
 
 func main() {
@@ -41,72 +35,20 @@ func main() {
 	}
 	l.Infof("Database check reply: %v", pong)
 
-	wsTimeout, err := time.ParseDuration(wsTimeoutStr)
-	if err != nil {
-		l.Fatalf("Couldn't parse WS timeout: %v\n", err)
-	}
-
-	symbols, err := binance.GetSymbols()
-	if err != nil {
-		l.Fatalf("Couldn't get symbols: %v\n", err)
-	}
-
-	log.Printf("Got %v symbols", len(symbols))
-	binanceOrderBook := binance.New()
-
-	wsStopC := make(chan struct{})
+	apiServer := api.New(cfg.API, l, database)
 
 	go func() {
-		wsTicker := time.NewTicker(30 * time.Millisecond)
-
-		for {
-			wsTimeoutTimer := time.NewTimer(wsTimeout)
-
-			go func() {
-				for {
-					select {
-					case <-binanceOrderBook.StopC:
-						return
-					case depth := <-binanceOrderBook.DiffDepthsC:
-						database.Store("depth", float64(time.Now().Unix()), depth)
-					}
-				}
-			}()
-
-			for {
-				select {
-				case <-quit:
-					binanceOrderBook.StopAll()
-					wsStopC <- struct{}{}
-					return
-				case <-wsTicker.C:
-					continue
-				case <-wsTimeoutTimer.C:
-					break
-				}
-			}
-
-			binanceOrderBook.StopAll()
-		}
-	}()
-
-	for _, symbol := range symbols {
-		go func(symbol string) {
-			err := binanceOrderBook.DiffDepths(symbol)
-			if err != nil {
-				l.Printf("Couldn't get diff depths on symbol %s: %v\n", symbol, err)
-			}
-		}(symbol)
-	}
-
-	log.Println("before quit")
-	server := api.New(cfg.API, l, database)
-
-	go func() {
-		if err = server.Serve(); err != nil {
+		if err = apiServer.Serve(); err != nil {
 			l.Fatalf("Server error: %v", err)
 		}
 	}()
+
+	binanaceExchange, err := binance.New(cfg.Binance, l, database, quit)
+	if err != nil {
+		l.Fatalf("Could not connect to Binanace: %v", err)
+	}
+
+	wsStopC := binanaceExchange.StartOrderBookWorker()
 
 	<-wsStopC
 }

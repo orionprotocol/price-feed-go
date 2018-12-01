@@ -36,6 +36,7 @@ func (c *Client) Check() (string, error) {
 	return c.client.Ping().Result()
 }
 
+// Store adds a new value and score in a sorted set with specified key.
 func (c *Client) Store(key string, score float64, val interface{}) {
 	c.client.ZAdd(key, redis.Z{
 		Score:  score,

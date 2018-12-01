@@ -1,4 +1,9 @@
 {
+  "binance": {
+    "ws_timeout": "12h",
+    "request_interval": "30ms"
+  },
+
   "logger": {
     "level": "debug",
     "to_stdout": true,
