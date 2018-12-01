@@ -28,7 +28,7 @@ func main() {
 		}
 	}()
 
-	database := storage.New(cfg.Storage)
+	database := storage.New(cfg.Storage, l)
 	pong, err := database.Check()
 	if err != nil {
 		l.Fatalf("Can't establish connection to database: %v", err)

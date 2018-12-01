@@ -6,6 +6,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/nkryuchkov/tradingbot/models"
+
 	"github.com/adshao/go-binance"
 	"github.com/nkryuchkov/tradingbot/logger"
 	"github.com/nkryuchkov/tradingbot/storage"
@@ -100,11 +102,18 @@ func (b *orderBook) StartOrderBookWorker() chan struct{} {
 					case <-b.StopC:
 						return
 					case depth := <-b.DiffDepthsC:
-						data, err := json.Marshal(depth)
-						if err != nil {
-							b.log.Errorf("Could not marshal depth: %v", err)
+						var data *models.Depth
+
+						if depth != nil {
+							data = &models.Depth{
+								Bids: depth.Bids,
+								Asks: depth.Asks,
+							}
 						}
-						b.database.Store(b.database.FormatKey("depth", depth.Symbol), float64(time.Now().Unix()), data)
+
+						if err := b.database.StoreOrderBook(depth.Symbol, data); err != nil {
+							b.log.Errorf("Could not store to database: %v")
+						}
 					}
 				}
 			}()
@@ -131,7 +140,7 @@ func (b *orderBook) StartOrderBookWorker() chan struct{} {
 		go func(symbol string) {
 			err := b.DiffDepths(symbol)
 			if err != nil {
-				b.log.Printf("Couldn't get diff depths on symbol %s: %v\n", symbol, err)
+				b.log.Printf("Couldn't get diff depths on symbol %s: %v", symbol, err)
 			}
 		}(symbol)
 	}
