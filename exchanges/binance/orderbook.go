@@ -58,10 +58,10 @@ func New(config *Config, log *logger.Logger, database *storage.Client, quitC cha
 
 	symbols, err := getSymbolList()
 	if err != nil {
-		return nil, errors.Wrapf(err, "couldn't parse Binanace symbol list")
+		return nil, errors.Wrapf(err, "couldn't parse Binance symbol list")
 	}
 
-	log.Debugf("Working with %v symbols on Binanace", len(symbols))
+	log.Debugf("Working with %v symbols on Binance", len(symbols))
 
 	ob := &orderBook{
 		config:                config,
