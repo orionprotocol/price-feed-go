@@ -61,7 +61,7 @@ func New(config *Config, log *logger.Logger, database *storage.Client, quitC cha
 		return nil, errors.Wrapf(err, "couldn't parse Binance symbol list")
 	}
 
-	log.Debugf("Working with %v symbols on Binance", len(symbols))
+	log.Infof("Working with %v symbols on Binance", len(symbols))
 
 	ob := &orderBook{
 		config:                config,
@@ -100,7 +100,11 @@ func (b *orderBook) StartOrderBookWorker() chan struct{} {
 					case <-b.StopC:
 						return
 					case depth := <-b.DiffDepthsC:
-						b.database.Store(b.database.FormatKey(redisPrefix, "depth"), float64(time.Now().Unix()), depth)
+						data, err := json.Marshal(depth)
+						if err != nil {
+							b.log.Errorf("Could not marshal depth: %v", err)
+						}
+						b.database.Store(b.database.FormatKey("depth", depth.Symbol), float64(time.Now().Unix()), data)
 					}
 				}
 			}()

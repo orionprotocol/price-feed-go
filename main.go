@@ -48,7 +48,7 @@ func main() {
 		l.Fatalf("Could not connect to Binance: %v", err)
 	}
 
-	wsStopC := binanceExchange.StartOrderBookWorker()
+	binanceExchange.StartOrderBookWorker()
 
-	<-wsStopC
+	<-quit
 }
