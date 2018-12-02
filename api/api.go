@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/batonych/tradingbot/logger"
+	"github.com/batonych/tradingbot/storage"
 	"github.com/gorilla/mux"
-	"github.com/nkryuchkov/tradingbot/logger"
-	"github.com/nkryuchkov/tradingbot/storage"
 )
 
 // Config represents an API configuration.

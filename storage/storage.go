@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nkryuchkov/tradingbot/models"
+	"github.com/batonych/tradingbot/models"
 
-	"github.com/nkryuchkov/tradingbot/logger"
+	"github.com/batonych/tradingbot/logger"
 
 	"gopkg.in/redis.v3"
 )

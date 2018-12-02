@@ -5,11 +5,11 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/nkryuchkov/tradingbot/api"
-	"github.com/nkryuchkov/tradingbot/config"
-	"github.com/nkryuchkov/tradingbot/exchanges/binance"
-	"github.com/nkryuchkov/tradingbot/logger"
-	"github.com/nkryuchkov/tradingbot/storage"
+	"github.com/batonych/tradingbot/api"
+	"github.com/batonych/tradingbot/config"
+	"github.com/batonych/tradingbot/exchanges/binance"
+	"github.com/batonych/tradingbot/logger"
+	"github.com/batonych/tradingbot/storage"
 )
 
 func main() {

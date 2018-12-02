@@ -6,11 +6,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/nkryuchkov/tradingbot/models"
-
 	"github.com/adshao/go-binance"
-	"github.com/nkryuchkov/tradingbot/logger"
-	"github.com/nkryuchkov/tradingbot/storage"
+	"github.com/batonych/tradingbot/logger"
+	"github.com/batonych/tradingbot/models"
+	"github.com/batonych/tradingbot/storage"
 	"github.com/pkg/errors"
 )
 
