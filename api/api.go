@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -51,35 +50,4 @@ func (api *API) Serve() error {
 	}
 
 	return nil
-}
-
-func (api *API) handleOrderBookRequest(w http.ResponseWriter, r *http.Request) {
-	vars := r.URL.Query()
-
-	pair, ok := vars["symbol"]
-	if !ok || len(pair) == 0 {
-		http.Error(w, "no pair specified", http.StatusBadRequest)
-		return
-	}
-
-	ob, err := api.storage.LoadOrderBook(pair[0])
-	if err != nil {
-		api.log.Errorf("Could not load order book from database: %v", err)
-		http.Error(w, "could not load order book", http.StatusInternalServerError)
-		return
-	}
-
-	data, err := json.Marshal(ob)
-	if err != nil {
-		api.log.Errorf("Could not marshal json: %v", err)
-		http.Error(w, "could not load order book", http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	if _, err = w.Write(data); err != nil {
-		api.log.Errorf("Could not write response: %v", err)
-		return
-	}
 }

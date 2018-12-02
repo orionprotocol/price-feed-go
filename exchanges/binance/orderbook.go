@@ -101,15 +101,7 @@ func (b *orderBook) StartOrderBookWorker() chan struct{} {
 					case <-b.StopC:
 						return
 					case depth := <-b.DiffDepthsC:
-						var data *models.Depth
-
-						if depth != nil {
-							data = &models.Depth{
-								Bids: depth.Bids,
-								Asks: depth.Asks,
-							}
-						}
-
+						data := models.SerializeBinanceOrderBook(depth)
 						if err := b.database.StoreOrderBook(depth.Symbol, data); err != nil {
 							b.log.Errorf("Could not store to database: %v")
 						}

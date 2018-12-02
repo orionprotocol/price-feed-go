@@ -49,30 +49,30 @@ func (c *Client) Check() (string, error) {
 	return c.client.Ping().Result()
 }
 
-func (c *Client) LoadOrderBook(pair string) (*models.Depth, error) {
+func (c *Client) LoadOrderBook(pair string) (models.OrderBook, error) {
 	result, err := c.client.ZRangeWithScores(c.formatKey("depth", pair), -2, -1).Result()
 	if err != nil {
-		return nil, err
+		return models.OrderBook{}, err
 	}
 
 	if len(result) == 0 {
-		return nil, err
+		return models.EmptyOrderBook, err
 	}
 
 	str, ok := result[0].Member.(string)
 	if !ok {
-		return nil, fmt.Errorf("%v is not string, but %v", result[0].Member, result[0].Member)
+		return models.OrderBook{}, fmt.Errorf("%v is not string, but %v", result[0].Member, result[0].Member)
 	}
 
-	var ob models.Depth
+	var ob models.OrderBook
 	if err = json.Unmarshal([]byte(str), &ob); err != nil {
-		return nil, fmt.Errorf("could not unmarshal %v: %v", str, err)
+		return models.OrderBook{}, fmt.Errorf("could not unmarshal %v: %v", str, err)
 	}
 
-	return &ob, nil
+	return ob, nil
 }
 
-func (c *Client) StoreOrderBook(pair string, depth *models.Depth) error {
+func (c *Client) StoreOrderBook(pair string, depth *models.OrderBook) error {
 	data, err := json.Marshal(depth)
 	if err != nil {
 		c.log.Errorf("Could not marshal depth: %v", err)
