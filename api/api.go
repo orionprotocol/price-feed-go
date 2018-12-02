@@ -10,6 +10,10 @@ import (
 	"github.com/gorilla/mux"
 )
 
+const (
+	v1Prefix = "/api/v1"
+)
+
 // Config represents an API configuration.
 type Config struct {
 	Port int `json:"port"`
@@ -38,7 +42,9 @@ func (api *API) Serve() error {
 	api.log.Infof("Starting API")
 
 	r := mux.NewRouter()
-	r.HandleFunc("/orderBook/{pair}", api.handleOrderBookRequest).Methods("GET")
+	s := r.PathPrefix(v1Prefix).Subrouter()
+
+	s.HandleFunc("/orderBook", api.handleOrderBookRequest).Methods("GET")
 
 	if err := http.ListenAndServe(":"+strconv.Itoa(api.config.Port), r); err != nil {
 		return err
@@ -48,15 +54,15 @@ func (api *API) Serve() error {
 }
 
 func (api *API) handleOrderBookRequest(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
+	vars := r.URL.Query()
 
 	pair, ok := vars["pair"]
-	if !ok {
+	if !ok || len(pair) == 0 {
 		http.Error(w, "no pair specified", http.StatusBadRequest)
 		return
 	}
 
-	ob, err := api.storage.LoadOrderBook(pair)
+	ob, err := api.storage.LoadOrderBook(pair[0])
 	if err != nil {
 		api.log.Errorf("Could not load order book from database: %v", err)
 		http.Error(w, "could not load order book", http.StatusInternalServerError)
