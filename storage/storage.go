@@ -2,6 +2,7 @@ package storage
 
 import (
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"strconv"
 	"strings"
@@ -48,30 +49,27 @@ func (c *Client) Check() (string, error) {
 	return c.client.Ping().Result()
 }
 
-func (c *Client) LoadOrderBook(pair string) (map[string]*models.Depth, error) {
-	result := make(map[string]*models.Depth)
-
-	values, err := c.client.ZRangeWithScores(c.formatKey("depth", pair), 0, -1).Result()
+func (c *Client) LoadOrderBook(pair string) (*models.Depth, error) {
+	result, err := c.client.ZRangeWithScores(c.formatKey("depth", pair), -2, -1).Result()
 	if err != nil {
 		return nil, err
 	}
 
-	for _, v := range values {
-		str, ok := v.Member.(string)
-		if !ok {
-			c.log.Errorf("%v is not a string, but %v", v.Member, v.Member)
-			continue
-		}
-
-		var ob models.Depth
-		if err = json.Unmarshal([]byte(str), &ob); err != nil {
-			c.log.Errorf("Could not unmarshal %v: %v", str, err)
-			continue
-		}
-		result[strconv.FormatInt(int64(v.Score), 10)] = &ob
+	if len(result) == 0 {
+		return nil, err
 	}
 
-	return result, nil
+	str, ok := result[0].Member.(string)
+	if !ok {
+		return nil, fmt.Errorf("%v is not string, but %v", result[0].Member, result[0].Member)
+	}
+
+	var ob models.Depth
+	if err = json.Unmarshal([]byte(str), &ob); err != nil {
+		return nil, fmt.Errorf("could not unmarshal %v: %v", str, err)
+	}
+
+	return &ob, nil
 }
 
 func (c *Client) StoreOrderBook(pair string, depth *models.Depth) error {
