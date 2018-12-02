@@ -56,7 +56,7 @@ func (api *API) Serve() error {
 func (api *API) handleOrderBookRequest(w http.ResponseWriter, r *http.Request) {
 	vars := r.URL.Query()
 
-	pair, ok := vars["pair"]
+	pair, ok := vars["symbol"]
 	if !ok || len(pair) == 0 {
 		http.Error(w, "no pair specified", http.StatusBadRequest)
 		return
