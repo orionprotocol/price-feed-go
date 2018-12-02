@@ -2,10 +2,16 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/batonych/tradingbot/models"
+)
+
+const (
+	minDepth = 1
+	maxDepth = 1000
 )
 
 type orderBookResponse struct {
@@ -38,6 +44,11 @@ func (api *API) handleOrderBookRequest(w http.ResponseWriter, r *http.Request) {
 	depth, err := strconv.Atoi(depthStr)
 	if err != nil {
 		http.Error(w, "depth should be a number", http.StatusBadRequest)
+		return
+	}
+
+	if depth < minDepth || depth > maxDepth {
+		http.Error(w, fmt.Sprintf("depth should be in range [%v; %v]", minDepth, maxDepth), http.StatusBadRequest)
 		return
 	}
 
