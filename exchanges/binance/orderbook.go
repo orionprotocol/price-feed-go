@@ -3,6 +3,7 @@ package binance
 import (
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"os"
 	"time"
 
@@ -14,8 +15,10 @@ import (
 )
 
 const (
-	priceURL    = "https://api.binance.com/api/v3/ticker/price"
-	redisPrefix = "binance"
+	priceURL          = "https://api.binance.com/api/v3/ticker/price"
+	depthURL          = "https://api.binance.com/api/v1/depth"
+	redisPrefix       = "binance"
+	orderBookMaxLimit = 1000
 )
 
 // Config represents an order book config
@@ -25,7 +28,7 @@ type Config struct {
 }
 
 // OrderBook represents a Binance order book worker.
-type orderBook struct {
+type OrderBook struct {
 	config                *Config
 	log                   *logger.Logger
 	database              *storage.Client
@@ -46,7 +49,7 @@ type orderBook struct {
 }
 
 // New returns a new Binance order book worker.
-func New(config *Config, log *logger.Logger, database *storage.Client, quitC chan os.Signal) (*orderBook, error) {
+func New(config *Config, log *logger.Logger, database *storage.Client, quitC chan os.Signal) (*OrderBook, error) {
 	wsTimeout, err := time.ParseDuration(config.WsTimeout)
 	if err != nil {
 		return nil, errors.Wrapf(err, "couldn't parse Binance WS timeout")
@@ -57,20 +60,12 @@ func New(config *Config, log *logger.Logger, database *storage.Client, quitC cha
 		return nil, errors.Wrapf(err, "couldn't parse Binance request interval")
 	}
 
-	symbols, err := getSymbolList()
-	if err != nil {
-		return nil, errors.Wrapf(err, "couldn't parse Binance symbol list")
-	}
-
-	log.Infof("Working with %v symbols on Binance", len(symbols))
-
-	ob := &orderBook{
+	ob := &OrderBook{
 		config:                config,
 		log:                   log,
 		database:              database,
 		wsTimeout:             wsTimeout,
 		requestInterval:       requestInterval,
-		symbols:               symbols,
 		quitC:                 quitC,
 		AggTradesC:            make(chan *binance.WsAggTradeEvent),
 		TradesC:               make(chan *binance.WsTradeEvent),
@@ -82,11 +77,15 @@ func New(config *Config, log *logger.Logger, database *storage.Client, quitC cha
 		StopC:                 make(chan struct{}),
 	}
 
+	if err = ob.fillSymbolList(); err != nil {
+		return nil, errors.Wrapf(err, "couldn't parse Binance symbol list")
+	}
+
 	return ob, nil
 }
 
 // StartOrderBookWorker starts a new Binance order book worker.
-func (b *orderBook) StartOrderBookWorker() chan struct{} {
+func (b *OrderBook) StartOrderBookWorker() chan struct{} {
 	wsStopC := make(chan struct{})
 
 	go func() {
@@ -139,7 +138,7 @@ func (b *orderBook) StartOrderBookWorker() chan struct{} {
 	return wsStopC
 }
 
-func (b *orderBook) AggTrades(symbol string) error {
+func (b *OrderBook) AggTrades(symbol string) error {
 	wsAggTradesHandler := func(event *binance.WsAggTradeEvent) {
 		b.AggTradesC <- event
 	}
@@ -155,7 +154,7 @@ func (b *orderBook) AggTrades(symbol string) error {
 	return nil
 }
 
-func (b *orderBook) Klines(symbol, interval string) error {
+func (b *OrderBook) Klines(symbol, interval string) error {
 	wsKlineHandler := func(event *binance.WsKlineEvent) {
 		b.KlinesC <- event
 	}
@@ -170,7 +169,7 @@ func (b *orderBook) Klines(symbol, interval string) error {
 	return nil
 }
 
-func (b *orderBook) Trades(symbol string) error {
+func (b *OrderBook) Trades(symbol string) error {
 	wsTradesHandler := func(event *binance.WsTradeEvent) {
 		b.TradesC <- event
 	}
@@ -185,7 +184,7 @@ func (b *orderBook) Trades(symbol string) error {
 	return nil
 }
 
-func (b *orderBook) AllMarketMiniTickers() error {
+func (b *OrderBook) AllMarketMiniTickers() error {
 	wsAllMarketMiniTickersHandler := func(event binance.WsAllMiniMarketsStatEvent) {
 		b.AllMarketMiniTickersC <- event
 	}
@@ -200,7 +199,7 @@ func (b *orderBook) AllMarketMiniTickers() error {
 	return nil
 }
 
-func (b *orderBook) AllMarketTickers() error {
+func (b *OrderBook) AllMarketTickers() error {
 	wsAllMarketTickersHandler := func(event binance.WsAllMarketsStatEvent) {
 		b.AllMarketTickersC <- event
 	}
@@ -215,7 +214,7 @@ func (b *orderBook) AllMarketTickers() error {
 	return nil
 }
 
-func (b *orderBook) PartialBookDepths(symbol, levels string) error {
+func (b *OrderBook) PartialBookDepths(symbol, levels string) error {
 	wsPartialBookDepthsHandler := func(event *binance.WsPartialDepthEvent) {
 		b.PartialBookDepthsC <- event
 	}
@@ -230,7 +229,7 @@ func (b *orderBook) PartialBookDepths(symbol, levels string) error {
 	return nil
 }
 
-func (b *orderBook) DiffDepths(symbol string) error {
+func (b *OrderBook) DiffDepths(symbol string) error {
 	wsDiffDepthsHandler := func(event *binance.WsDepthEvent) {
 		b.DiffDepthsC <- event
 	}
@@ -245,7 +244,7 @@ func (b *orderBook) DiffDepths(symbol string) error {
 	return nil
 }
 
-func (b *orderBook) StopAll() {
+func (b *OrderBook) StopAll() {
 	for _, c := range b.stops {
 		c <- struct{}{}
 	}
@@ -257,16 +256,16 @@ func (b *orderBook) StopAll() {
 	b.StopC <- struct{}{}
 }
 
-func (b *orderBook) makeErrorHandler() binance.ErrHandler {
+func (b *OrderBook) makeErrorHandler() binance.ErrHandler {
 	return func(err error) {
 		b.log.Printf("Error in WS connection with Binance: %v", err)
 	}
 }
 
-func getSymbolList() ([]string, error) {
+func (b *OrderBook) fillSymbolList() error {
 	resp, err := http.Get(priceURL)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	var data []struct {
@@ -275,7 +274,7 @@ func getSymbolList() ([]string, error) {
 	}
 
 	if err = json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return nil, err
+		return err
 	}
 
 	symbols := make([]string, 0, len(data))
@@ -284,5 +283,19 @@ func getSymbolList() ([]string, error) {
 		symbols = append(symbols, item.Symbol)
 	}
 
-	return symbols, nil
+	b.log.Infof("Working with %v symbols on Binance", len(symbols))
+
+	b.symbols = symbols
+	return nil
+}
+
+func (b *OrderBook) buildDepthURL(symbol string) (string, error) {
+	u, err := url.Parse(depthURL)
+	if err != nil {
+		return "", err
+	}
+	q := u.Query()
+	q.Set("symbol", symbol)
+	u.RawQuery = q.Encode()
+	return u.String(), nil
 }
