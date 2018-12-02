@@ -2,9 +2,12 @@ package binance
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
+	"sync"
 	"time"
 
 	"github.com/adshao/go-binance"
@@ -17,8 +20,10 @@ import (
 const (
 	priceURL          = "https://api.binance.com/api/v3/ticker/price"
 	depthURL          = "https://api.binance.com/api/v1/depth"
-	redisPrefix       = "binance"
 	orderBookMaxLimit = 1000
+	delta             = 0.000001
+	zero              = "0.00000000"
+	apiInterval       = 1 * time.Second
 )
 
 // Config represents an order book config
@@ -27,7 +32,7 @@ type Config struct {
 	RequestInterval string `json:"request_interval"`
 }
 
-// OrderBook represents a Binance order book worker.
+// OrderBookAPI represents a Binance order book worker.
 type OrderBook struct {
 	config                *Config
 	log                   *logger.Logger
@@ -46,6 +51,8 @@ type OrderBook struct {
 	StopC                 chan struct{}
 	stops                 []chan struct{}
 	dones                 []chan struct{}
+	cacheMu               sync.Mutex
+	cache                 map[string]models.OrderBookInternal
 }
 
 // New returns a new Binance order book worker.
@@ -75,9 +82,10 @@ func New(config *Config, log *logger.Logger, database *storage.Client, quitC cha
 		PartialBookDepthsC:    make(chan *binance.WsPartialDepthEvent),
 		DiffDepthsC:           make(chan *binance.WsDepthEvent, 10000),
 		StopC:                 make(chan struct{}),
+		cache:                 make(map[string]models.OrderBookInternal),
 	}
 
-	if err = ob.fillSymbolList(); err != nil {
+	if err = ob.fillSymbolListWithTestData(); err != nil {
 		return nil, errors.Wrapf(err, "couldn't parse Binance symbol list")
 	}
 
@@ -100,9 +108,9 @@ func (b *OrderBook) StartOrderBookWorker() chan struct{} {
 					case <-b.StopC:
 						return
 					case depth := <-b.DiffDepthsC:
-						data := models.SerializeBinanceOrderBook(depth)
+						data := models.SerializeBinanceOrderBookWS(depth)
 						if err := b.database.StoreOrderBook(depth.Symbol, data); err != nil {
-							b.log.Errorf("Could not store to database: %v")
+							b.log.Errorf("Could not store to database: %v", err)
 						}
 					}
 				}
@@ -128,11 +136,14 @@ func (b *OrderBook) StartOrderBookWorker() chan struct{} {
 
 	for _, symbol := range b.symbols {
 		go func(symbol string) {
-			err := b.DiffDepths(symbol)
+			// err := b.DiffDepths(symbol)
+			err := b.SubscribeOrderBook(symbol)
 			if err != nil {
 				b.log.Printf("Couldn't get diff depths on symbol %s: %v", symbol, err)
 			}
 		}(symbol)
+
+		time.Sleep(apiInterval)
 	}
 
 	return wsStopC
@@ -244,6 +255,84 @@ func (b *OrderBook) DiffDepths(symbol string) error {
 	return nil
 }
 
+// https://github.com/binance-exchange/binance-official-api-docs/blob/master/web-socket-streams.md#how-to-manage-a-local-order-book-correctly
+func (b *OrderBook) SubscribeOrderBook(symbol string) error {
+	for ; ; <-time.Tick(b.requestInterval) {
+		// Get a depth snapshot from https://www.binance.com/api/v1/depth?symbol=BNBBTC&limit=1000
+		orderBook, err := b.getOrderBook(symbol, orderBookMaxLimit)
+
+		b.log.Debugf("Got order book for symbol %v: %+v", symbol, orderBook)
+
+		if err != nil {
+			return errors.Wrapf(err, "could not get order book")
+		}
+		b.cacheMu.Lock()
+		b.cache[symbol] = orderBook
+		b.cacheMu.Unlock()
+
+		// Buffer the events you receive from the stream
+		wsDiffDepthsHandler := func(event *binance.WsDepthEvent) {
+			if err = b.updateOrderBook(symbol, event); err != nil {
+				b.log.Errorf("Could not update order book: %v", err)
+			}
+		}
+
+		// Open a stream to wss://stream.binance.com:9443/ws/bnbbtc@depth
+		doneC, _, err := binance.WsDepthServe(symbol, wsDiffDepthsHandler, b.makeErrorHandler())
+		if err != nil {
+			return err
+		}
+
+		<-doneC
+	}
+}
+
+func (b *OrderBook) updateOrderBook(symbol string, event *binance.WsDepthEvent) error {
+	b.cacheMu.Lock()
+	defer b.cacheMu.Unlock()
+
+	// Drop any event where u is <= lastUpdateId in the snapshot
+	if event.UpdateID <= b.cache[symbol].LastUpdateID {
+		return nil
+	}
+
+	for _, bid := range event.Bids {
+		// qty, err := strconv.ParseFloat(bid.Quantity, 64)
+		// if err != nil {
+		// 	b.log.Errorf("Could not parse quantity: %v", err)
+		// 	continue
+		// }
+		if /*qty < delta || qty > -delta*/ bid.Quantity == zero {
+			b.log.Debugf("deleting bid with price %v for symbol %v", bid.Price, symbol)
+			delete(b.cache[symbol].Bids, bid.Price)
+			continue
+		}
+
+		b.cache[symbol].Bids[bid.Price] = bid.Quantity
+	}
+
+	for _, ask := range event.Asks {
+		/*qty, err := strconv.ParseFloat(ask.Quantity, 64)
+		if err != nil {
+			b.log.Errorf("Could not parse quantity: %v", err)
+			continue
+		}*/
+		if /* qty < delta || qty > -delta*/ ask.Quantity == zero {
+			b.log.Debugf("deleting ask with price %v for symbol %v", ask.Price, symbol)
+			delete(b.cache[symbol].Asks, ask.Price)
+			continue
+		}
+
+		b.cache[symbol].Asks[ask.Price] = ask.Quantity
+	}
+
+	if err := b.database.StoreOrderBookInternal(symbol, b.cache[symbol]); err != nil {
+		b.log.Errorf("Could not store to database: %v", err)
+	}
+
+	return nil
+}
+
 func (b *OrderBook) StopAll() {
 	for _, c := range b.stops {
 		c <- struct{}{}
@@ -268,6 +357,10 @@ func (b *OrderBook) fillSymbolList() error {
 		return err
 	}
 
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("fillSymbolList received bad status code: %v", resp.StatusCode)
+	}
+
 	var data []struct {
 		Symbol string `json:"symbol"`
 		Price  string `json:"price"`
@@ -289,13 +382,45 @@ func (b *OrderBook) fillSymbolList() error {
 	return nil
 }
 
-func (b *OrderBook) buildDepthURL(symbol string) (string, error) {
+func (b *OrderBook) fillSymbolListWithTestData() error {
+	b.symbols = testSymbols
+	return nil
+}
+
+func (b *OrderBook) getOrderBook(symbol string, depth int) (response models.OrderBookInternal, err error) {
+	orderBookURL, err := b.makeOrderBookURL(symbol, depth)
+	if err != nil {
+		return models.OrderBookInternal{}, errors.Wrapf(err, "could not make order book URL")
+	}
+
+	resp, err := http.Get(orderBookURL)
+	if err != nil {
+		return models.OrderBookInternal{}, err
+	}
+
+	if resp.StatusCode == http.StatusTooManyRequests {
+		time.Sleep(apiInterval)
+	} else if resp.StatusCode != http.StatusOK {
+		return models.OrderBookInternal{}, fmt.Errorf("getOrderBook received bad status code: %v", resp.StatusCode)
+	}
+
+	var data models.OrderBookResponse
+
+	if err = json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return models.OrderBookInternal{}, err
+	}
+
+	return models.SerializeBinanceOrderBookREST(data), nil
+}
+
+func (b *OrderBook) makeOrderBookURL(symbol string, depth int) (string, error) {
 	u, err := url.Parse(depthURL)
 	if err != nil {
 		return "", err
 	}
 	q := u.Query()
 	q.Set("symbol", symbol)
+	q.Set("limit", strconv.Itoa(depth))
 	u.RawQuery = q.Encode()
 	return u.String(), nil
 }

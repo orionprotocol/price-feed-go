@@ -3,13 +3,19 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"github.com/batonych/tradingbot/models"
 )
 
 type orderBookResponse struct {
 	Symbol string `json:"symbol"`
-	models.OrderBook
+	models.OrderBookAPI
+}
+
+type orderBookResponseInternal struct {
+	Symbol string `json:"symbol"`
+	models.OrderBookAPI
 }
 
 func (api *API) handleOrderBookRequest(w http.ResponseWriter, r *http.Request) {
@@ -22,16 +28,29 @@ func (api *API) handleOrderBookRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	symbol := symbols[0]
 
-	orderBook, err := api.storage.LoadOrderBook(symbol)
+	depths, ok := vars["depth"]
+	if !ok || len(depths) == 0 {
+		http.Error(w, "no depth specified", http.StatusBadRequest)
+		return
+	}
+	depthStr := depths[0]
+
+	depth, err := strconv.Atoi(depthStr)
+	if err != nil {
+		http.Error(w, "depth should be a number", http.StatusBadRequest)
+		return
+	}
+
+	orderBook, err := api.storage.LoadOrderBookInternal(symbol, depth)
 	if err != nil {
 		api.log.Errorf("Could not load order book from database: %v", err)
 		http.Error(w, "could not load order book", http.StatusInternalServerError)
 		return
 	}
 
-	resp := orderBookResponse{
-		Symbol:    symbol,
-		OrderBook: orderBook,
+	resp := orderBookResponseInternal{
+		Symbol:       symbol,
+		OrderBookAPI: orderBook,
 	}
 
 	data, err := json.Marshal(resp)

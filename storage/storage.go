@@ -8,11 +8,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/batonych/tradingbot/logger"
 	"github.com/batonych/tradingbot/models"
 
-	"github.com/batonych/tradingbot/logger"
-
 	"gopkg.in/redis.v3"
+)
+
+const (
+	roundTime = 10 * time.Millisecond
 )
 
 // Config represents a database configuration.
@@ -49,10 +52,10 @@ func (c *Client) Check() (string, error) {
 	return c.client.Ping().Result()
 }
 
-func (c *Client) LoadOrderBook(pair string) (models.OrderBook, error) {
+func (c *Client) LoadOrderBook(pair string) (models.OrderBookAPI, error) {
 	result, err := c.client.ZRangeWithScores(c.formatKey("depth", pair), -2, -1).Result()
 	if err != nil {
-		return models.OrderBook{}, err
+		return models.OrderBookAPI{}, err
 	}
 
 	if len(result) == 0 {
@@ -61,18 +64,18 @@ func (c *Client) LoadOrderBook(pair string) (models.OrderBook, error) {
 
 	str, ok := result[0].Member.(string)
 	if !ok {
-		return models.OrderBook{}, fmt.Errorf("%v is not string, but %v", result[0].Member, result[0].Member)
+		return models.OrderBookAPI{}, fmt.Errorf("%v is not string, but %v", result[0].Member, result[0].Member)
 	}
 
-	var ob models.OrderBook
+	var ob models.OrderBookAPI
 	if err = json.Unmarshal([]byte(str), &ob); err != nil {
-		return models.OrderBook{}, fmt.Errorf("could not unmarshal %v: %v", str, err)
+		return models.OrderBookAPI{}, fmt.Errorf("could not unmarshal %v: %v", str, err)
 	}
 
 	return ob, nil
 }
 
-func (c *Client) StoreOrderBook(pair string, depth *models.OrderBook) error {
+func (c *Client) StoreOrderBook(pair string, depth *models.OrderBookAPI) error {
 	data, err := json.Marshal(depth)
 	if err != nil {
 		c.log.Errorf("Could not marshal depth: %v", err)
@@ -80,6 +83,42 @@ func (c *Client) StoreOrderBook(pair string, depth *models.OrderBook) error {
 	}
 
 	return c.store(c.formatKey("depth", pair), float64(time.Now().Unix()), string(data))
+}
+
+func (c *Client) LoadOrderBookInternal(symbol string, depth int) (models.OrderBookAPI, error) {
+	result, err := c.client.ZRangeWithScores(c.formatKey("orderBook", symbol), -1, -1).Result()
+	if err != nil {
+		return models.OrderBookAPI{}, err
+	}
+
+	if len(result) == 0 {
+		return models.EmptyOrderBook, err
+	}
+
+	str, ok := result[0].Member.(string)
+	if !ok {
+		return models.OrderBookAPI{}, fmt.Errorf("%v is not string, but %v", result[0].Member, result[0].Member)
+	}
+
+	var ob models.OrderBookInternal
+	if err = json.Unmarshal([]byte(str), &ob); err != nil {
+		return models.OrderBookAPI{}, fmt.Errorf("could not unmarshal %v: %v", str, err)
+	}
+
+	orderBook := ob.Format(depth)
+
+	c.log.Debugf("LoadOrderBookInternal result: %+v", orderBook)
+	return orderBook, nil
+}
+
+func (c *Client) StoreOrderBookInternal(symbol string, orderBook models.OrderBookInternal) error {
+	data, err := json.Marshal(orderBook)
+	if err != nil {
+		c.log.Errorf("Could not marshal depth: %v", err)
+		return err
+	}
+
+	return c.store(c.formatKey("orderBook", symbol), float64(time.Now(). /*.Round(roundTime)*/ Unix()), string(data))
 }
 
 // store adds a new value and score in a sorted set with specified key.
