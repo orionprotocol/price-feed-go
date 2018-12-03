@@ -20,9 +20,8 @@ import (
 const (
 	priceURL          = "https://api.binance.com/api/v3/ticker/price"
 	depthURL          = "https://api.binance.com/api/v1/depth"
-	orderBookMaxLimit = 1000
-	delta             = 0.000001
 	zero              = "0.00000000"
+	orderBookMaxLimit = 1000
 	apiInterval       = 1 * time.Second
 )
 
@@ -93,60 +92,15 @@ func New(config *Config, log *logger.Logger, database *storage.Client, quitC cha
 }
 
 // StartOrderBookWorker starts a new Binance order book worker.
-func (b *OrderBook) StartOrderBookWorker() chan struct{} {
-	wsStopC := make(chan struct{})
-
-	go func() {
-		wsTicker := time.NewTicker(b.requestInterval)
-
-		for {
-			wsTimeoutTimer := time.NewTimer(b.wsTimeout)
-
-			go func() {
-				for {
-					select {
-					case <-b.StopC:
-						return
-					case depth := <-b.DiffDepthsC:
-						data := models.SerializeBinanceOrderBookWS(depth)
-						if err := b.database.StoreOrderBook(depth.Symbol, data); err != nil {
-							b.log.Errorf("Could not store to database: %v", err)
-						}
-					}
-				}
-			}()
-
-		outer:
-			for {
-				select {
-				case <-b.quitC:
-					b.StopAll()
-					wsStopC <- struct{}{}
-					return
-				case <-wsTicker.C:
-					continue
-				case <-wsTimeoutTimer.C:
-					break outer
-				}
-			}
-
-			b.StopAll()
-		}
-	}()
-
+func (b *OrderBook) StartOrderBookWorker() {
 	for _, symbol := range b.symbols {
 		go func(symbol string) {
-			// err := b.DiffDepths(symbol)
 			err := b.SubscribeOrderBook(symbol)
 			if err != nil {
 				b.log.Printf("Couldn't get diff depths on symbol %s: %v", symbol, err)
 			}
 		}(symbol)
-
-		time.Sleep(apiInterval)
 	}
-
-	return wsStopC
 }
 
 func (b *OrderBook) AggTrades(symbol string) error {
@@ -297,12 +251,7 @@ func (b *OrderBook) updateOrderBook(symbol string, event *binance.WsDepthEvent) 
 	}
 
 	for _, bid := range event.Bids {
-		// qty, err := strconv.ParseFloat(bid.Quantity, 64)
-		// if err != nil {
-		// 	b.log.Errorf("Could not parse quantity: %v", err)
-		// 	continue
-		// }
-		if /*qty < delta || qty > -delta*/ bid.Quantity == zero {
+		if bid.Quantity == zero {
 			b.log.Debugf("deleting bid with price %v for symbol %v", bid.Price, symbol)
 			delete(b.cache[symbol].Bids, bid.Price)
 			continue
@@ -312,12 +261,7 @@ func (b *OrderBook) updateOrderBook(symbol string, event *binance.WsDepthEvent) 
 	}
 
 	for _, ask := range event.Asks {
-		/*qty, err := strconv.ParseFloat(ask.Quantity, 64)
-		if err != nil {
-			b.log.Errorf("Could not parse quantity: %v", err)
-			continue
-		}*/
-		if /* qty < delta || qty > -delta*/ ask.Quantity == zero {
+		if ask.Quantity == zero {
 			b.log.Debugf("deleting ask with price %v for symbol %v", ask.Price, symbol)
 			delete(b.cache[symbol].Asks, ask.Price)
 			continue
@@ -383,7 +327,7 @@ func (b *OrderBook) fillSymbolList() error {
 }
 
 func (b *OrderBook) fillSymbolListWithTestData() error {
-	b.symbols = testSymbols
+	b.symbols = binanceSymbols
 	return nil
 }
 
