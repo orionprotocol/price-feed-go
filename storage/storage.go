@@ -15,7 +15,8 @@ import (
 )
 
 const (
-	roundTime = 10 * time.Millisecond
+	roundTime  = 10 * time.Millisecond
+	expiration = 1 * time.Minute
 )
 
 // Config represents a database configuration.
@@ -118,6 +119,10 @@ func (c *Client) StoreOrderBookInternal(symbol string, orderBook models.OrderBoo
 		return err
 	}
 
+	if err = c.purge(c.formatKey("orderBook", symbol), 0, int64(time.Now().Add(-expiration).Unix())); err != nil {
+		return err
+	}
+
 	return c.store(c.formatKey("orderBook", symbol), float64(time.Now(). /*.Round(roundTime)*/ Unix()), string(data))
 }
 
@@ -127,6 +132,10 @@ func (c *Client) store(key string, score float64, val string) error {
 		Score:  score,
 		Member: val,
 	}).Err()
+}
+
+func (c *Client) purge(key string, min, max int64) error {
+	return c.client.ZRemRangeByScore(key, strconv.FormatInt(min, 10), strconv.FormatInt(max, 10)).Err()
 }
 
 // formatKey formats keys using given args separating them with a colon.
