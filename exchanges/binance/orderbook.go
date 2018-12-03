@@ -103,6 +103,14 @@ func (b *OrderBook) StartOrderBookWorker() {
 	}
 }
 
+func (b *OrderBook) GetOrderBook(symbol string) (models.OrderBookInternal, bool) {
+	b.cacheMu.Lock()
+	defer b.cacheMu.Unlock()
+
+	ob, ok := b.cache[symbol]
+	return ob, ok
+}
+
 func (b *OrderBook) AggTrades(symbol string) error {
 	wsAggTradesHandler := func(event *binance.WsAggTradeEvent) {
 		b.AggTradesC <- event

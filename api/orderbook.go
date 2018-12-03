@@ -52,16 +52,15 @@ func (api *API) handleOrderBookRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	orderBook, err := api.storage.LoadOrderBookInternal(symbol, depth)
-	if err != nil {
-		api.log.Errorf("Could not load order book from database: %v", err)
-		http.Error(w, "could not load order book", http.StatusInternalServerError)
+	orderBook, ok := api.binance.GetOrderBook(symbol)
+	if !ok {
+		http.Error(w, "symbol not exists", http.StatusBadRequest)
 		return
 	}
 
 	resp := orderBookResponseInternal{
 		Symbol:       symbol,
-		OrderBookAPI: orderBook,
+		OrderBookAPI: orderBook.Format(depth),
 	}
 
 	data, err := json.Marshal(resp)

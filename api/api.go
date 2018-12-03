@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/batonych/tradingbot/exchanges/binance"
 	"github.com/batonych/tradingbot/logger"
 	"github.com/batonych/tradingbot/storage"
 	"github.com/gorilla/mux"
@@ -23,14 +24,16 @@ type API struct {
 	config  *Config
 	log     *logger.Logger
 	storage *storage.Client
+	binance *binance.OrderBook
 }
 
 // New returns a new API instance.
-func New(config *Config, log *logger.Logger, storage *storage.Client) *API {
+func New(config *Config, log *logger.Logger, storage *storage.Client, binance *binance.OrderBook) *API {
 	api := &API{
 		config:  config,
 		log:     log,
 		storage: storage,
+		binance: binance,
 	}
 
 	return api
