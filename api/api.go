@@ -47,6 +47,7 @@ func (api *API) Serve() error {
 	s := r.PathPrefix(v1Prefix).Subrouter()
 
 	s.HandleFunc("/orderBook", api.handleOrderBookRequest).Methods("GET")
+	s.HandleFunc("/candles", api.handleCandlestickRequest).Methods("GET")
 
 	if err := http.ListenAndServe(":"+strconv.Itoa(api.config.Port), r); err != nil {
 		return err

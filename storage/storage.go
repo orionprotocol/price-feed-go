@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/adshao/go-binance"
+
 	"github.com/batonych/tradingbot/logger"
 	"github.com/batonych/tradingbot/models"
 
@@ -15,8 +17,9 @@ import (
 )
 
 const (
-	roundTime  = 10 * time.Millisecond
-	expiration = 1 * time.Minute
+	roundTime             = 10 * time.Millisecond
+	orderBookExpiration   = 1 * time.Minute
+	candlestickExpiration = 1 * time.Hour
 )
 
 // Config represents a database configuration.
@@ -112,18 +115,62 @@ func (c *Client) LoadOrderBookInternal(symbol string, depth int) (models.OrderBo
 	return orderBook, nil
 }
 
+func (c *Client) LoadCandlestickList(symbol, interval string, timeStart, timeEnd int64) ([]models.Candle, error) {
+	result, err := c.client.ZRangeByScoreWithScores(c.formatKey("candlestick", symbol, interval),
+		redis.ZRangeByScore{
+			Min: strconv.FormatInt(timeStart, 10),
+			Max: strconv.FormatInt(timeEnd, 10),
+		}).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	candleList := make([]models.Candle, 0, len(result))
+
+	for _, v := range result {
+		str, ok := v.Member.(string)
+		if !ok {
+			return nil, fmt.Errorf("%v is not string, but %v", v.Member, v.Member)
+		}
+
+		var ob models.Candle
+		if err = json.Unmarshal([]byte(str), &ob); err != nil {
+			return nil, fmt.Errorf("could not unmarshal %v: %v", str, err)
+		}
+
+		candleList = append(candleList, ob)
+	}
+
+	c.log.Debugf("LoadCandlestickList result: %+v", candleList)
+	return candleList, nil
+}
+
 func (c *Client) StoreOrderBookInternal(symbol string, orderBook models.OrderBookInternal) error {
 	data, err := json.Marshal(orderBook)
 	if err != nil {
-		c.log.Errorf("Could not marshal depth: %v", err)
+		c.log.Errorf("Could not marshal order book: %v", err)
 		return err
 	}
 
-	if err = c.purge(c.formatKey("orderBook", symbol), 0, int64(time.Now().Add(-expiration).Unix())); err != nil {
+	if err = c.purge(c.formatKey("orderBook", symbol), 0, int64(time.Now().Add(-orderBookExpiration).Unix())); err != nil {
 		return err
 	}
 
 	return c.store(c.formatKey("orderBook", symbol), float64(time.Now(). /*.Round(roundTime)*/ Unix()), string(data))
+}
+
+func (c *Client) StoreCandlestick(symbol, interval string, candlestick *binance.WsKlineEvent) error {
+	data, err := json.Marshal(models.CandleFromEvent(candlestick))
+	if err != nil {
+		c.log.Errorf("Could not marshal candlestick: %v", err)
+		return err
+	}
+
+	if err = c.purge(c.formatKey("candlestick", symbol, interval), 0, int64(time.Now().Add(-candlestickExpiration).Unix())); err != nil {
+		return err
+	}
+
+	return c.store(c.formatKey("candlestick", symbol, interval), float64(time.Now(). /*.Round(roundTime)*/ Unix()), string(data))
 }
 
 // store adds a new value and score in a sorted set with specified key.

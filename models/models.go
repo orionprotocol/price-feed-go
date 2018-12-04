@@ -7,6 +7,35 @@ import (
 	"github.com/adshao/go-binance"
 )
 
+var (
+	CandlestickIntervalList = []string{
+		"1m",
+		"3m",
+		"5m",
+		"15m",
+		"30m",
+		"1h",
+		"2h",
+		"4h",
+		"6h",
+		"8h",
+		"12h",
+		"1d",
+		"3d",
+		"1w",
+		"1M",
+	}
+)
+
+func IsValidInterval(s string) bool {
+	for _, v := range CandlestickIntervalList {
+		if v == s {
+			return true
+		}
+	}
+	return false
+}
+
 // OrderBookAPI represents the order book data format.
 type OrderBookAPI struct {
 	Asks []AskBid `json:"asks"`
@@ -166,4 +195,38 @@ func SerializeBinanceOrderBookWS(event *binance.WsDepthEvent) *OrderBookAPI {
 		Asks: asks,
 		Bids: bids,
 	}
+}
+
+type CandlestickResponse struct {
+	TimeStart int64    `json:"timeStart"`
+	TimeEnd   int64    `json:"timeEnd"`
+	Candles   []Candle `json:"candles"`
+}
+
+type Candle struct {
+	Time   int64   `json:"time"`
+	Open   float64 `json:"open"`
+	Close  float64 `json:"close"`
+	High   float64 `json:"high"`
+	Low    float64 `json:"low"`
+	Volume float64 `json:"volume"`
+}
+
+func CandleFromEvent(event *binance.WsKlineEvent) *Candle {
+	if event == nil {
+		return nil
+	}
+	return &Candle{
+		Time:   event.Time,
+		Open:   mustParseFloat64(event.Kline.Open),
+		Close:  mustParseFloat64(event.Kline.Close),
+		High:   mustParseFloat64(event.Kline.High),
+		Low:    mustParseFloat64(event.Kline.Low),
+		Volume: mustParseFloat64(event.Kline.Volume),
+	}
+}
+
+func mustParseFloat64(s string) float64 {
+	val, _ := strconv.ParseFloat(s, 64)
+	return val
 }

@@ -50,8 +50,13 @@ type Worker struct {
 	StopC                 chan struct{}
 	stops                 []chan struct{}
 	dones                 []chan struct{}
-	cacheMu               sync.Mutex
-	cache                 map[string]models.OrderBookInternal
+	orderBookCacheMu      sync.Mutex
+	orderBookCache        map[string]models.OrderBookInternal
+}
+
+type SymbolInterval struct {
+	Symbol   string
+	Interval string
 }
 
 // NewWorker returns a new Binance worker.
@@ -81,7 +86,7 @@ func NewWorker(config *Config, log *logger.Logger, database *storage.Client, qui
 		PartialBookDepthsC:    make(chan *binance.WsPartialDepthEvent),
 		DiffDepthsC:           make(chan *binance.WsDepthEvent, 10000),
 		StopC:                 make(chan struct{}),
-		cache:                 make(map[string]models.OrderBookInternal),
+		orderBookCache:        make(map[string]models.OrderBookInternal),
 	}
 
 	if err = ob.fillSymbolListWithTestData(); err != nil {
@@ -100,14 +105,15 @@ func (b *Worker) Start() {
 				b.log.Printf("Couldn't get diff depths on symbol %s: %v", symbol, err)
 			}
 		}(symbol)
+		go b.SubscribeCandlestickAll(symbol)
 	}
 }
 
 func (b *Worker) GetOrderBook(symbol string) (models.OrderBookInternal, bool) {
-	b.cacheMu.Lock()
-	defer b.cacheMu.Unlock()
+	b.orderBookCacheMu.Lock()
+	defer b.orderBookCacheMu.Unlock()
 
-	ob, ok := b.cache[symbol]
+	ob, ok := b.orderBookCache[symbol]
 	return ob, ok
 }
 
@@ -223,14 +229,14 @@ func (b *Worker) SubscribeOrderBook(symbol string) error {
 		// Get a depth snapshot from https://www.binance.com/api/v1/depth?symbol=BNBBTC&limit=1000
 		orderBook, err := b.getOrderBook(symbol, orderBookMaxLimit)
 
-		b.log.Debugf("Got order book for symbol %v: %+v", symbol, orderBook)
+		// b.log.Debugf("Got order book for symbol %v: %+v", symbol, orderBook)
 
 		if err != nil {
 			return errors.Wrapf(err, "could not get order book")
 		}
-		b.cacheMu.Lock()
-		b.cache[symbol] = orderBook
-		b.cacheMu.Unlock()
+		b.orderBookCacheMu.Lock()
+		b.orderBookCache[symbol] = orderBook
+		b.orderBookCacheMu.Unlock()
 
 		// Buffer the events you receive from the stream
 		wsDiffDepthsHandler := func(event *binance.WsDepthEvent) {
@@ -249,37 +255,73 @@ func (b *Worker) SubscribeOrderBook(symbol string) error {
 	}
 }
 
+func (b *Worker) SubscribeCandlestickAll(symbol string) {
+	for _, v := range models.CandlestickIntervalList {
+		go func(s string) {
+			if err := b.SubscribeCandlestick(symbol, s); err != nil {
+				b.log.Errorf("Could not subscribe to candlestick interval %v symbol %v: %v", v, symbol, err)
+			}
+		}(v)
+	}
+}
+
+func (b *Worker) SubscribeCandlestick(symbol, interval string) error {
+	for ; ; <-time.Tick(b.requestInterval) {
+		wsCandlestickHandler := func(event *binance.WsKlineEvent) {
+			if err := b.updateCandlestick(symbol, interval, event); err != nil {
+				b.log.Errorf("Could not update order book: %v", err)
+			}
+		}
+
+		// Open a stream to wss://stream.binance.com:9443/ws/bnbbtc@depth
+		doneC, _, err := binance.WsKlineServe(symbol, interval, wsCandlestickHandler, b.makeErrorHandler())
+		if err != nil {
+			return err
+		}
+
+		<-doneC
+	}
+}
+
 func (b *Worker) updateOrderBook(symbol string, event *binance.WsDepthEvent) error {
-	b.cacheMu.Lock()
-	defer b.cacheMu.Unlock()
+	b.orderBookCacheMu.Lock()
+	defer b.orderBookCacheMu.Unlock()
 
 	// Drop any event where u is <= lastUpdateId in the snapshot
-	if event.UpdateID <= b.cache[symbol].LastUpdateID {
+	if event.UpdateID <= b.orderBookCache[symbol].LastUpdateID {
 		return nil
 	}
 
 	for _, bid := range event.Bids {
 		if bid.Quantity == zero {
-			b.log.Debugf("deleting bid with price %v for symbol %v", bid.Price, symbol)
-			delete(b.cache[symbol].Bids, bid.Price)
+			// b.log.Debugf("deleting bid with price %v for symbol %v", bid.Price, symbol)
+			delete(b.orderBookCache[symbol].Bids, bid.Price)
 			continue
 		}
 
-		b.cache[symbol].Bids[bid.Price] = bid.Quantity
+		b.orderBookCache[symbol].Bids[bid.Price] = bid.Quantity
 	}
 
 	for _, ask := range event.Asks {
 		if ask.Quantity == zero {
-			b.log.Debugf("deleting ask with price %v for symbol %v", ask.Price, symbol)
-			delete(b.cache[symbol].Asks, ask.Price)
+			// b.log.Debugf("deleting ask with price %v for symbol %v", ask.Price, symbol)
+			delete(b.orderBookCache[symbol].Asks, ask.Price)
 			continue
 		}
 
-		b.cache[symbol].Asks[ask.Price] = ask.Quantity
+		b.orderBookCache[symbol].Asks[ask.Price] = ask.Quantity
 	}
 
-	if err := b.database.StoreOrderBookInternal(symbol, b.cache[symbol]); err != nil {
-		b.log.Errorf("Could not store to database: %v", err)
+	if err := b.database.StoreOrderBookInternal(symbol, b.orderBookCache[symbol]); err != nil {
+		b.log.Errorf("Could not store order book to database: %v", err)
+	}
+
+	return nil
+}
+
+func (b *Worker) updateCandlestick(symbol, interval string, event *binance.WsKlineEvent) error {
+	if err := b.database.StoreCandlestick(symbol, interval, event); err != nil {
+		b.log.Errorf("Could not store candlestick to database: %v", err)
 	}
 
 	return nil
