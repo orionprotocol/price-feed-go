@@ -32,7 +32,7 @@ type Config struct {
 }
 
 // OrderBookAPI represents a Binance order book worker.
-type OrderBook struct {
+type Worker struct {
 	config                *Config
 	log                   *logger.Logger
 	database              *storage.Client
@@ -54,8 +54,8 @@ type OrderBook struct {
 	cache                 map[string]models.OrderBookInternal
 }
 
-// New returns a new Binance order book worker.
-func New(config *Config, log *logger.Logger, database *storage.Client, quitC chan os.Signal) (*OrderBook, error) {
+// NewWorker returns a new Binance worker.
+func NewWorker(config *Config, log *logger.Logger, database *storage.Client, quitC chan os.Signal) (*Worker, error) {
 	wsTimeout, err := time.ParseDuration(config.WsTimeout)
 	if err != nil {
 		return nil, errors.Wrapf(err, "couldn't parse Binance WS timeout")
@@ -66,7 +66,7 @@ func New(config *Config, log *logger.Logger, database *storage.Client, quitC cha
 		return nil, errors.Wrapf(err, "couldn't parse Binance request interval")
 	}
 
-	ob := &OrderBook{
+	ob := &Worker{
 		config:                config,
 		log:                   log,
 		database:              database,
@@ -91,8 +91,8 @@ func New(config *Config, log *logger.Logger, database *storage.Client, quitC cha
 	return ob, nil
 }
 
-// StartOrderBookWorker starts a new Binance order book worker.
-func (b *OrderBook) StartOrderBookWorker() {
+// Start starts a new Binance worker.
+func (b *Worker) Start() {
 	for _, symbol := range b.symbols {
 		go func(symbol string) {
 			err := b.SubscribeOrderBook(symbol)
@@ -103,7 +103,7 @@ func (b *OrderBook) StartOrderBookWorker() {
 	}
 }
 
-func (b *OrderBook) GetOrderBook(symbol string) (models.OrderBookInternal, bool) {
+func (b *Worker) GetOrderBook(symbol string) (models.OrderBookInternal, bool) {
 	b.cacheMu.Lock()
 	defer b.cacheMu.Unlock()
 
@@ -111,7 +111,7 @@ func (b *OrderBook) GetOrderBook(symbol string) (models.OrderBookInternal, bool)
 	return ob, ok
 }
 
-func (b *OrderBook) AggTrades(symbol string) error {
+func (b *Worker) AggTrades(symbol string) error {
 	wsAggTradesHandler := func(event *binance.WsAggTradeEvent) {
 		b.AggTradesC <- event
 	}
@@ -127,7 +127,7 @@ func (b *OrderBook) AggTrades(symbol string) error {
 	return nil
 }
 
-func (b *OrderBook) Klines(symbol, interval string) error {
+func (b *Worker) Klines(symbol, interval string) error {
 	wsKlineHandler := func(event *binance.WsKlineEvent) {
 		b.KlinesC <- event
 	}
@@ -142,7 +142,7 @@ func (b *OrderBook) Klines(symbol, interval string) error {
 	return nil
 }
 
-func (b *OrderBook) Trades(symbol string) error {
+func (b *Worker) Trades(symbol string) error {
 	wsTradesHandler := func(event *binance.WsTradeEvent) {
 		b.TradesC <- event
 	}
@@ -157,7 +157,7 @@ func (b *OrderBook) Trades(symbol string) error {
 	return nil
 }
 
-func (b *OrderBook) AllMarketMiniTickers() error {
+func (b *Worker) AllMarketMiniTickers() error {
 	wsAllMarketMiniTickersHandler := func(event binance.WsAllMiniMarketsStatEvent) {
 		b.AllMarketMiniTickersC <- event
 	}
@@ -172,7 +172,7 @@ func (b *OrderBook) AllMarketMiniTickers() error {
 	return nil
 }
 
-func (b *OrderBook) AllMarketTickers() error {
+func (b *Worker) AllMarketTickers() error {
 	wsAllMarketTickersHandler := func(event binance.WsAllMarketsStatEvent) {
 		b.AllMarketTickersC <- event
 	}
@@ -187,7 +187,7 @@ func (b *OrderBook) AllMarketTickers() error {
 	return nil
 }
 
-func (b *OrderBook) PartialBookDepths(symbol, levels string) error {
+func (b *Worker) PartialBookDepths(symbol, levels string) error {
 	wsPartialBookDepthsHandler := func(event *binance.WsPartialDepthEvent) {
 		b.PartialBookDepthsC <- event
 	}
@@ -202,7 +202,7 @@ func (b *OrderBook) PartialBookDepths(symbol, levels string) error {
 	return nil
 }
 
-func (b *OrderBook) DiffDepths(symbol string) error {
+func (b *Worker) DiffDepths(symbol string) error {
 	wsDiffDepthsHandler := func(event *binance.WsDepthEvent) {
 		b.DiffDepthsC <- event
 	}
@@ -218,7 +218,7 @@ func (b *OrderBook) DiffDepths(symbol string) error {
 }
 
 // https://github.com/binance-exchange/binance-official-api-docs/blob/master/web-socket-streams.md#how-to-manage-a-local-order-book-correctly
-func (b *OrderBook) SubscribeOrderBook(symbol string) error {
+func (b *Worker) SubscribeOrderBook(symbol string) error {
 	for ; ; <-time.Tick(b.requestInterval) {
 		// Get a depth snapshot from https://www.binance.com/api/v1/depth?symbol=BNBBTC&limit=1000
 		orderBook, err := b.getOrderBook(symbol, orderBookMaxLimit)
@@ -249,7 +249,7 @@ func (b *OrderBook) SubscribeOrderBook(symbol string) error {
 	}
 }
 
-func (b *OrderBook) updateOrderBook(symbol string, event *binance.WsDepthEvent) error {
+func (b *Worker) updateOrderBook(symbol string, event *binance.WsDepthEvent) error {
 	b.cacheMu.Lock()
 	defer b.cacheMu.Unlock()
 
@@ -285,7 +285,7 @@ func (b *OrderBook) updateOrderBook(symbol string, event *binance.WsDepthEvent) 
 	return nil
 }
 
-func (b *OrderBook) StopAll() {
+func (b *Worker) StopAll() {
 	for _, c := range b.stops {
 		c <- struct{}{}
 	}
@@ -297,13 +297,13 @@ func (b *OrderBook) StopAll() {
 	b.StopC <- struct{}{}
 }
 
-func (b *OrderBook) makeErrorHandler() binance.ErrHandler {
+func (b *Worker) makeErrorHandler() binance.ErrHandler {
 	return func(err error) {
 		b.log.Printf("Error in WS connection with Binance: %v", err)
 	}
 }
 
-func (b *OrderBook) fillSymbolList() error {
+func (b *Worker) fillSymbolList() error {
 	resp, err := http.Get(priceURL)
 	if err != nil {
 		return err
@@ -334,12 +334,12 @@ func (b *OrderBook) fillSymbolList() error {
 	return nil
 }
 
-func (b *OrderBook) fillSymbolListWithTestData() error {
+func (b *Worker) fillSymbolListWithTestData() error {
 	b.symbols = binanceSymbols
 	return nil
 }
 
-func (b *OrderBook) getOrderBook(symbol string, depth int) (response models.OrderBookInternal, err error) {
+func (b *Worker) getOrderBook(symbol string, depth int) (response models.OrderBookInternal, err error) {
 	orderBookURL, err := b.makeOrderBookURL(symbol, depth)
 	if err != nil {
 		return models.OrderBookInternal{}, errors.Wrapf(err, "could not make order book URL")
@@ -365,7 +365,7 @@ func (b *OrderBook) getOrderBook(symbol string, depth int) (response models.Orde
 	return models.SerializeBinanceOrderBookREST(data), nil
 }
 
-func (b *OrderBook) makeOrderBookURL(symbol string, depth int) (string, error) {
+func (b *Worker) makeOrderBookURL(symbol string, depth int) (string, error) {
 	u, err := url.Parse(depthURL)
 	if err != nil {
 		return "", err

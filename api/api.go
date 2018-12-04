@@ -24,11 +24,11 @@ type API struct {
 	config  *Config
 	log     *logger.Logger
 	storage *storage.Client
-	binance *binance.OrderBook
+	binance *binance.Worker
 }
 
 // New returns a new API instance.
-func New(config *Config, log *logger.Logger, storage *storage.Client, binance *binance.OrderBook) *API {
+func New(config *Config, log *logger.Logger, storage *storage.Client, binance *binance.Worker) *API {
 	api := &API{
 		config:  config,
 		log:     log,

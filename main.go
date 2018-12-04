@@ -35,14 +35,14 @@ func main() {
 	}
 	l.Infof("Database check reply: %v", pong)
 
-	binanceExchange, err := binance.New(cfg.Binance, l, database, quit)
+	binanceWorker, err := binance.NewWorker(cfg.Binance, l, database, quit)
 	if err != nil {
 		l.Fatalf("Could not connect to Binance: %v", err)
 	}
 
-	binanceExchange.StartOrderBookWorker()
+	binanceWorker.Start()
 
-	apiServer := api.New(cfg.API, l, database, binanceExchange)
+	apiServer := api.New(cfg.API, l, database, binanceWorker)
 
 	go func() {
 		if err = apiServer.Serve(); err != nil {
