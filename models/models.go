@@ -3,6 +3,7 @@ package models
 import (
 	"sort"
 	"strconv"
+	"time"
 
 	"github.com/adshao/go-binance"
 )
@@ -204,12 +205,14 @@ type CandlestickResponse struct {
 }
 
 type Candle struct {
-	Time   int64   `json:"time"`
-	Open   float64 `json:"open"`
-	Close  float64 `json:"close"`
-	High   float64 `json:"high"`
-	Low    float64 `json:"low"`
-	Volume float64 `json:"volume"`
+	TimeStart int64   `json:"timeStart"`
+	TimeEnd   int64   `json:"timeEnd"`
+	Time      int64   `json:"time"`
+	Open      float64 `json:"open"`
+	Close     float64 `json:"close"`
+	High      float64 `json:"high"`
+	Low       float64 `json:"low"`
+	Volume    float64 `json:"volume"`
 }
 
 func CandleFromEvent(event *binance.WsKlineEvent) *Candle {
@@ -217,12 +220,27 @@ func CandleFromEvent(event *binance.WsKlineEvent) *Candle {
 		return nil
 	}
 	return &Candle{
-		Time:   event.Time,
-		Open:   mustParseFloat64(event.Kline.Open),
-		Close:  mustParseFloat64(event.Kline.Close),
-		High:   mustParseFloat64(event.Kline.High),
-		Low:    mustParseFloat64(event.Kline.Low),
-		Volume: mustParseFloat64(event.Kline.Volume),
+		TimeStart: event.Kline.StartTime / 1000,
+		TimeEnd:   event.Kline.EndTime / 1000,
+		Time:      event.Time / 1000,
+		Open:      mustParseFloat64(event.Kline.Open),
+		Close:     mustParseFloat64(event.Kline.Close),
+		High:      mustParseFloat64(event.Kline.High),
+		Low:       mustParseFloat64(event.Kline.Low),
+		Volume:    mustParseFloat64(event.Kline.Volume),
+	}
+}
+
+func CandleFromAPI(candlestick *binance.Kline) *Candle {
+	return &Candle{
+		TimeStart: candlestick.OpenTime / 1000,
+		TimeEnd:   candlestick.CloseTime / 1000,
+		Time:      time.Now().Unix(),
+		Open:      mustParseFloat64(candlestick.Open),
+		Close:     mustParseFloat64(candlestick.Close),
+		High:      mustParseFloat64(candlestick.High),
+		Low:       mustParseFloat64(candlestick.Low),
+		Volume:    mustParseFloat64(candlestick.Volume),
 	}
 }
 

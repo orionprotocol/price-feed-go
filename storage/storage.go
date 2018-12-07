@@ -20,6 +20,10 @@ const (
 	roundTime             = 10 * time.Millisecond
 	orderBookExpiration   = 1 * time.Minute
 	candlestickExpiration = 1 * time.Hour
+	day                   = 24 * time.Hour
+	threeDays             = 3 * day
+	week                  = 7 * day
+	month                 = 31 * day
 )
 
 // Config represents a database configuration.
@@ -116,10 +120,32 @@ func (c *Client) LoadOrderBookInternal(symbol string, depth int) (models.OrderBo
 }
 
 func (c *Client) LoadCandlestickList(symbol, interval string, timeStart, timeEnd int64) ([]models.Candle, error) {
+	var intervalDuration time.Duration
+	switch interval {
+	case "1d":
+		intervalDuration = day
+	case "3d":
+		intervalDuration = threeDays
+	case "1w":
+		intervalDuration = week
+	case "1M":
+		intervalDuration = month
+	default:
+		var err error
+
+		intervalDuration, err = time.ParseDuration(interval)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse interval: %v", err)
+		}
+	}
+
+	timeStartRounded := time.Unix(timeStart, 0).Truncate(intervalDuration)
+	timeEndRounded := time.Unix(timeEnd, 0).Truncate(intervalDuration)
+
 	result, err := c.client.ZRangeByScoreWithScores(c.formatKey("candlestick", symbol, interval),
 		redis.ZRangeByScore{
-			Min: strconv.FormatInt(timeStart, 10),
-			Max: strconv.FormatInt(timeEnd, 10),
+			Min: strconv.FormatInt(timeStartRounded.Unix(), 10),
+			Max: strconv.FormatInt(timeEndRounded.Unix(), 10),
 		}).Result()
 	if err != nil {
 		return nil, err
@@ -160,17 +186,33 @@ func (c *Client) StoreOrderBookInternal(symbol string, orderBook models.OrderBoo
 }
 
 func (c *Client) StoreCandlestick(symbol, interval string, candlestick *binance.WsKlineEvent) error {
-	data, err := json.Marshal(models.CandleFromEvent(candlestick))
+	candle := models.CandleFromEvent(candlestick)
+
+	data, err := json.Marshal(candle)
 	if err != nil {
 		c.log.Errorf("Could not marshal candlestick: %v", err)
 		return err
 	}
 
-	if err = c.purge(c.formatKey("candlestick", symbol, interval), 0, int64(time.Now().Add(-candlestickExpiration).Unix())); err != nil {
+	return c.storeCandlestick(symbol, interval, float64(candle.TimeStart/1000), data)
+}
+
+func (c *Client) StoreCandlestickAPI(symbol, interval string, candlestick *binance.Kline) error {
+	data, err := json.Marshal(models.CandleFromAPI(candlestick))
+	if err != nil {
+		c.log.Errorf("Could not marshal candlestick: %v", err)
 		return err
 	}
 
-	return c.store(c.formatKey("candlestick", symbol, interval), float64(time.Now(). /*.Round(roundTime)*/ Unix()), string(data))
+	return c.storeCandlestick(symbol, interval, float64(candlestick.OpenTime/1000), data)
+}
+
+func (c *Client) storeCandlestick(symbol, interval string, openTime float64, candlestick []byte) error {
+	if err := c.purge(c.formatKey("candlestick", symbol, interval), 0, int64(time.Now().UTC().Add(-candlestickExpiration).Unix())); err != nil {
+		return err
+	}
+
+	return c.store(c.formatKey("candlestick", symbol, interval), openTime, string(candlestick))
 }
 
 // store adds a new value and score in a sorted set with specified key.

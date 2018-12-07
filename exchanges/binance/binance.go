@@ -1,6 +1,7 @@
 package binance
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -258,10 +259,30 @@ func (b *Worker) SubscribeOrderBook(symbol string) error {
 func (b *Worker) SubscribeCandlestickAll(symbol string) {
 	for _, v := range models.CandlestickIntervalList {
 		go func(s string) {
+			b.initCandlesticks(symbol, s)
+
 			if err := b.SubscribeCandlestick(symbol, s); err != nil {
 				b.log.Errorf("Could not subscribe to candlestick interval %v symbol %v: %v", v, symbol, err)
 			}
 		}(v)
+	}
+}
+
+func (b *Worker) initCandlesticks(symbol, interval string) {
+	client := binance.NewClient("", "")
+	candlesticks, err := client.NewKlinesService().Symbol(symbol).
+		Interval(interval).Do(context.Background())
+	if err != nil {
+		b.log.Errorf("Could not load candlesticks from REST API with interval %v and symbol %v: %v",
+			interval, symbol, err)
+
+		return
+	}
+
+	for _, k := range candlesticks {
+		if err := b.updateCandlestickAPI(symbol, interval, k); err != nil {
+			b.log.Errorf("Could not update candlesticks from REST API: %v", err)
+		}
 	}
 }
 
@@ -322,6 +343,14 @@ func (b *Worker) updateOrderBook(symbol string, event *binance.WsDepthEvent) err
 func (b *Worker) updateCandlestick(symbol, interval string, event *binance.WsKlineEvent) error {
 	if err := b.database.StoreCandlestick(symbol, interval, event); err != nil {
 		b.log.Errorf("Could not store candlestick to database: %v", err)
+	}
+
+	return nil
+}
+
+func (b *Worker) updateCandlestickAPI(symbol, interval string, candlestick *binance.Kline) error {
+	if err := b.database.StoreCandlestickAPI(symbol, interval, candlestick); err != nil {
+		b.log.Errorf("Could not store candlestick from REST API to database: %v", err)
 	}
 
 	return nil
