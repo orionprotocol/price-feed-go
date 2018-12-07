@@ -23,7 +23,7 @@ const (
 	day                   = 24 * time.Hour
 	threeDays             = 3 * day
 	week                  = 7 * day
-	month                 = 31 * day
+	millisecond = 1 * time.Millisecond
 )
 
 // Config represents a database configuration.
@@ -120,27 +120,28 @@ func (c *Client) LoadOrderBookInternal(symbol string, depth int) (models.OrderBo
 }
 
 func (c *Client) LoadCandlestickList(symbol, interval string, timeStart, timeEnd int64) ([]models.Candle, error) {
-	var intervalDuration time.Duration
+	var timeStartRounded, timeEndRounded time.Time
 	switch interval {
 	case "1d":
-		intervalDuration = day
+		timeStartRounded = time.Unix(timeStart, 0).Truncate(day)
 	case "3d":
-		intervalDuration = threeDays
+		timeStartRounded = time.Unix(timeStart, 0).Truncate(threeDays)
 	case "1w":
-		intervalDuration = week
+		timeStartRounded = time.Unix(timeStart, 0).Truncate(week)
 	case "1M":
-		intervalDuration = month
+		timeStartDefault := time.Unix(timeStart, 0)
+		timeStartRounded = time.Date(timeStartDefault.Year(), timeStartDefault.Month(),
+			1, 0, 0, 0, int(millisecond), nil)
 	default:
-		var err error
-
-		intervalDuration, err = time.ParseDuration(interval)
+		intervalDuration, err := time.ParseDuration(interval)
 		if err != nil {
 			return nil, fmt.Errorf("could not parse interval: %v", err)
 		}
+
+		timeStartRounded = time.Unix(timeStart, 0).Truncate(intervalDuration)
 	}
 
-	timeStartRounded := time.Unix(timeStart, 0).Truncate(intervalDuration)
-	timeEndRounded := time.Unix(timeEnd, 0).Truncate(intervalDuration)
+	timeEndRounded = time.Unix(timeEnd, 0)
 
 	result, err := c.client.ZRangeByScoreWithScores(c.formatKey("candlestick", symbol, interval),
 		redis.ZRangeByScore{

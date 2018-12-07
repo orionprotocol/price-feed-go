@@ -1,15 +1,14 @@
 package main
 
 import (
-	"log"
-	"os"
-	"os/signal"
-
 	"github.com/batonych/tradingbot/api"
 	"github.com/batonych/tradingbot/config"
 	"github.com/batonych/tradingbot/exchanges/binance"
 	"github.com/batonych/tradingbot/logger"
 	"github.com/batonych/tradingbot/storage"
+	"log"
+	"os"
+	"os/signal"
 )
 
 func main() {
