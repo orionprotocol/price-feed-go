@@ -19,11 +19,11 @@ import (
 const (
 	roundTime             = 10 * time.Millisecond
 	orderBookExpiration   = 1 * time.Minute
-	candlestickExpiration = 1 * time.Hour
+	candlestickExpiration = 5 * 12 * 30 * 24 * time.Hour
 	day                   = 24 * time.Hour
 	threeDays             = 3 * day
 	week                  = 7 * day
-	millisecond = 1 * time.Millisecond
+	millisecond           = 1 * time.Millisecond
 )
 
 // Config represents a database configuration.
