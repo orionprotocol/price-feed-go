@@ -209,9 +209,9 @@ func (c *Client) StoreCandlestickAPI(symbol, interval string, candlestick *binan
 }
 
 func (c *Client) storeCandlestick(symbol, interval string, openTime float64, candlestick []byte) error {
-	if err := c.purge(c.formatKey("candlestick", symbol, interval), 0, int64(time.Now().UTC().Add(-candlestickExpiration).Unix())); err != nil {
+	/*if err := c.purge(c.formatKey("candlestick", symbol, interval), 0, int64(time.Now().UTC().Add(-candlestickExpiration).Unix())); err != nil {
 		return err
-	}
+	}*/
 
 	return c.store(c.formatKey("candlestick", symbol, interval), openTime, string(candlestick))
 }
