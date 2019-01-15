@@ -120,9 +120,6 @@ func (c *Client) LoadOrderBookInternal(symbol string, depth int) (models.OrderBo
 }
 
 func (c *Client) LoadCandlestickList(symbol, interval string, timeStart, timeEnd int64) ([]models.Candle, error) {
-	timeStart *= 1000
-	timeEnd *= 1000
-
 	var timeStartRounded, timeEndRounded time.Time
 	switch interval {
 	case "1d":
@@ -202,13 +199,14 @@ func (c *Client) StoreCandlestick(symbol, interval string, candlestick *binance.
 }
 
 func (c *Client) StoreCandlestickAPI(symbol, interval string, candlestick *binance.Kline) error {
-	data, err := json.Marshal(models.CandleFromAPI(candlestick))
+	candle := models.CandleFromAPI(candlestick)
+	data, err := json.Marshal(candle)
 	if err != nil {
 		c.log.Errorf("Could not marshal candlestick: %v", err)
 		return err
 	}
 
-	return c.storeCandlestick(symbol, interval, candlestick.OpenTime, data)
+	return c.storeCandlestick(symbol, interval, candle.TimeStart, data)
 }
 
 func (c *Client) storeCandlestick(symbol, interval string, openTime int64, candlestick []byte) error {

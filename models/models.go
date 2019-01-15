@@ -219,6 +219,7 @@ func CandleFromEvent(event *binance.WsKlineEvent) *Candle {
 	if event == nil {
 		return nil
 	}
+
 	return &Candle{
 		TimeStart: event.Kline.StartTime / 1000,
 		TimeEnd:   event.Kline.EndTime / 1000,
