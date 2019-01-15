@@ -195,7 +195,7 @@ func (c *Client) StoreCandlestick(symbol, interval string, candlestick *binance.
 		return err
 	}
 
-	return c.storeCandlestick(symbol, interval, float64(candle.TimeStart/1000), data)
+	return c.storeCandlestick(symbol, interval, float64(candle.TimeStart), data)
 }
 
 func (c *Client) StoreCandlestickAPI(symbol, interval string, candlestick *binance.Kline) error {
@@ -205,13 +205,13 @@ func (c *Client) StoreCandlestickAPI(symbol, interval string, candlestick *binan
 		return err
 	}
 
-	return c.storeCandlestick(symbol, interval, float64(candlestick.OpenTime/1000), data)
+	return c.storeCandlestick(symbol, interval, float64(candlestick.OpenTime), data)
 }
 
 func (c *Client) storeCandlestick(symbol, interval string, openTime float64, candlestick []byte) error {
-	/*if err := c.purge(c.formatKey("candlestick", symbol, interval), 0, int64(time.Now().UTC().Add(-candlestickExpiration).Unix())); err != nil {
+	if err := c.purge(c.formatKey("candlestick", symbol, interval), openTime, openTime); err != nil {
 		return err
-	}*/
+	}
 
 	return c.store(c.formatKey("candlestick", symbol, interval), openTime, string(candlestick))
 }
@@ -224,8 +224,9 @@ func (c *Client) store(key string, score float64, val string) error {
 	}).Err()
 }
 
-func (c *Client) purge(key string, min, max int64) error {
-	return c.client.ZRemRangeByScore(key, strconv.FormatInt(min, 10), strconv.FormatInt(max, 10)).Err()
+func (c *Client) purge(key string, min, max float64) error {
+	return c.client.ZRemRangeByScore(key, strconv.FormatFloat(min, 'f', -1, 64),
+		strconv.FormatFloat(max, 'f', -1, 64)).Err()
 }
 
 // formatKey formats keys using given args separating them with a colon.
