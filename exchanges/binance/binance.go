@@ -23,6 +23,7 @@ const (
 	depthURL          = "https://api.binance.com/api/v1/depth"
 	zero              = "0.00000000"
 	orderBookMaxLimit = 1000
+	candlestickLimit  = 1000
 	apiInterval       = 1 * time.Second
 )
 
@@ -271,7 +272,7 @@ func (b *Worker) SubscribeCandlestickAll(symbol string) {
 func (b *Worker) initCandlesticks(symbol, interval string) {
 	client := binance.NewClient("", "")
 	candlesticks, err := client.NewKlinesService().Symbol(symbol).
-		Interval(interval).Do(context.Background())
+		Interval(interval).Limit(candlestickLimit).Do(context.Background())
 	if err != nil {
 		b.log.Errorf("Could not load candlesticks from REST API with interval %v and symbol %v: %v",
 			interval, symbol, err)
