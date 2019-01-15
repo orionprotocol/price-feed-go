@@ -1,14 +1,15 @@
 package main
 
 import (
+	"log"
+	"os"
+	"os/signal"
+
 	"github.com/batonych/tradingbot/api"
 	"github.com/batonych/tradingbot/config"
 	"github.com/batonych/tradingbot/exchanges/binance"
 	"github.com/batonych/tradingbot/logger"
 	"github.com/batonych/tradingbot/storage"
-	"log"
-	"os"
-	"os/signal"
 )
 
 func main() {
@@ -44,7 +45,7 @@ func main() {
 	apiServer := api.New(cfg.API, l, database, binanceWorker)
 
 	go func() {
-		if err = apiServer.Serve(); err != nil {
+		if err = apiServer.Start(); err != nil {
 			l.Fatalf("Server error: %v", err)
 		}
 	}()

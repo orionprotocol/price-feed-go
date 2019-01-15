@@ -39,8 +39,8 @@ func New(config *Config, log *logger.Logger, storage *storage.Client, binance *b
 	return api
 }
 
-// Serve starts the API server.
-func (api *API) Serve() error {
+// Start starts the API server.
+func (api *API) Start() error {
 	api.log.Infof("Starting API")
 
 	r := mux.NewRouter()
@@ -49,9 +49,5 @@ func (api *API) Serve() error {
 	s.HandleFunc("/orderBook", api.handleOrderBookRequest).Methods("GET")
 	s.HandleFunc("/candles", api.handleCandlestickRequest).Methods("GET")
 
-	if err := http.ListenAndServe(":"+strconv.Itoa(api.config.Port), r); err != nil {
-		return err
-	}
-
-	return nil
+	return http.ListenAndServe(":"+strconv.Itoa(api.config.Port), r)
 }
