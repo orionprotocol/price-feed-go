@@ -120,6 +120,9 @@ func (c *Client) LoadOrderBookInternal(symbol string, depth int) (models.OrderBo
 }
 
 func (c *Client) LoadCandlestickList(symbol, interval string, timeStart, timeEnd int64) ([]models.Candle, error) {
+	timeStart *= 1000
+	timeEnd *= 1000
+
 	var timeStartRounded, timeEndRounded time.Time
 	switch interval {
 	case "1d":
@@ -179,7 +182,7 @@ func (c *Client) StoreOrderBookInternal(symbol string, orderBook models.OrderBoo
 		return err
 	}
 
-	if err = c.purge(c.formatKey("orderBook", symbol), 0, int64(time.Now().Add(-orderBookExpiration).Unix())); err != nil {
+	if err = c.purge(c.formatKey("orderBook", symbol), 0, time.Now().Add(-orderBookExpiration).Unix()); err != nil {
 		return err
 	}
 
@@ -195,7 +198,7 @@ func (c *Client) StoreCandlestick(symbol, interval string, candlestick *binance.
 		return err
 	}
 
-	return c.storeCandlestick(symbol, interval, float64(candle.TimeStart), data)
+	return c.storeCandlestick(symbol, interval, candle.TimeStart, data)
 }
 
 func (c *Client) StoreCandlestickAPI(symbol, interval string, candlestick *binance.Kline) error {
@@ -205,15 +208,15 @@ func (c *Client) StoreCandlestickAPI(symbol, interval string, candlestick *binan
 		return err
 	}
 
-	return c.storeCandlestick(symbol, interval, float64(candlestick.OpenTime), data)
+	return c.storeCandlestick(symbol, interval, candlestick.OpenTime, data)
 }
 
-func (c *Client) storeCandlestick(symbol, interval string, openTime float64, candlestick []byte) error {
+func (c *Client) storeCandlestick(symbol, interval string, openTime int64, candlestick []byte) error {
 	if err := c.purge(c.formatKey("candlestick", symbol, interval), openTime, openTime); err != nil {
 		return err
 	}
 
-	return c.store(c.formatKey("candlestick", symbol, interval), openTime, string(candlestick))
+	return c.store(c.formatKey("candlestick", symbol, interval), float64(openTime), string(candlestick))
 }
 
 // store adds a new value and score in a sorted set with specified key.
@@ -224,9 +227,8 @@ func (c *Client) store(key string, score float64, val string) error {
 	}).Err()
 }
 
-func (c *Client) purge(key string, min, max float64) error {
-	return c.client.ZRemRangeByScore(key, strconv.FormatFloat(min, 'f', -1, 64),
-		strconv.FormatFloat(max, 'f', -1, 64)).Err()
+func (c *Client) purge(key string, min, max int64) error {
+	return c.client.ZRemRangeByScore(key, strconv.FormatInt(min, 10), strconv.FormatInt(max, 10)).Err()
 }
 
 // formatKey formats keys using given args separating them with a colon.

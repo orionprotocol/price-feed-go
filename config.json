@@ -17,7 +17,7 @@
 
   "storage": {
     "endpoint": "127.0.0.1:6379",
-    "poolSize": 10,
+    "poolSize": 1000,
     "database": 0,
     "password": ""
   }

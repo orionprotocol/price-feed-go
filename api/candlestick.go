@@ -42,8 +42,6 @@ func (api *API) handleCandlestickRequest(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	timeStart *= 1000
-
 	timeEnds, ok := vars["timeEnd"]
 	if !ok || len(timeEnds) == 0 {
 		http.Error(w, "no timeEnd specified", http.StatusBadRequest)
@@ -55,8 +53,6 @@ func (api *API) handleCandlestickRequest(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "timeEnd is not a number", http.StatusBadRequest)
 		return
 	}
-
-	timeEnd *= 1000
 
 	candles, err := api.storage.LoadCandlestickList(symbol, interval, timeStart, timeEnd)
 	if err != nil {
