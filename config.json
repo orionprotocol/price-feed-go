@@ -4,6 +4,10 @@
     "request_interval": "30ms"
   },
 
+  "bittrex": {
+    "request_interval": "1s"
+  },
+
   "logger": {
     "level": "debug",
     "to_stdout": true,

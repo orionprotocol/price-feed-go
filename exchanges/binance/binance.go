@@ -258,7 +258,7 @@ func (b *Worker) SubscribeOrderBook(symbol string) error {
 }
 
 func (b *Worker) SubscribeCandlestickAll(symbol string) {
-	for _, v := range models.CandlestickIntervalList {
+	for _, v := range models.BinanceCandlestickIntervalList {
 		go func(s string) {
 			b.initCandlesticks(symbol, s)
 
@@ -342,7 +342,7 @@ func (b *Worker) updateOrderBook(symbol string, event *binance.WsDepthEvent) err
 }
 
 func (b *Worker) updateCandlestick(symbol, interval string, event *binance.WsKlineEvent) error {
-	if err := b.database.StoreCandlestick(symbol, interval, event); err != nil {
+	if err := b.database.StoreCandlestickBinance(symbol, interval, event); err != nil {
 		b.log.Errorf("Could not store candlestick to database: %v", err)
 	}
 
@@ -350,7 +350,7 @@ func (b *Worker) updateCandlestick(symbol, interval string, event *binance.WsKli
 }
 
 func (b *Worker) updateCandlestickAPI(symbol, interval string, candlestick *binance.Kline) error {
-	if err := b.database.StoreCandlestickAPI(symbol, interval, candlestick); err != nil {
+	if err := b.database.StoreCandlestickBinanceAPI(symbol, interval, candlestick); err != nil {
 		b.log.Errorf("Could not store candlestick from REST API to database: %v", err)
 	}
 
@@ -407,7 +407,7 @@ func (b *Worker) fillSymbolList() error {
 }
 
 func (b *Worker) fillSymbolListWithTestData() error {
-	b.symbols = binanceSymbols
+	b.symbols = models.BinanceSymbols
 	return nil
 }
 

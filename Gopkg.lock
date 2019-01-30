@@ -42,6 +42,14 @@
   version = "v1.4.0"
 
 [[projects]]
+  branch = "master"
+  digest = "1:0de210dd268abdf06a0b701a367208193ded5c02c566aa114a93f15e9016db3f"
+  name = "github.com/jyap808/go-poloniex"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "50b163cd72c2230ab6f107a0c024f53d488c4ec0"
+
+[[projects]]
   digest = "1:0a69a1c0db3591fcefb47f115b224592c8dfa4368b7ba9fae509d5e16cdc95c8"
   name = "github.com/konsorten/go-windows-terminal-sequences"
   packages = ["."]
@@ -58,12 +66,36 @@
   version = "v0.8.0"
 
 [[projects]]
+  digest = "1:81e02c4edb639c80559c0650f9401d3e2dcc3256d1fa215382bb7c83c1db9126"
+  name = "github.com/shopspring/decimal"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "cd690d0c9e2447b1ef2a129a6b7b49077da89b8e"
+  version = "1.1.0"
+
+[[projects]]
   digest = "1:69b1cc331fca23d702bd72f860c6a647afd0aa9fcbc1d0659b1365e26546dd70"
   name = "github.com/sirupsen/logrus"
   packages = ["."]
   pruneopts = "UT"
   revision = "bcd833dfe83d3cebad139e4a29ed79cb2318bf95"
   version = "v1.2.0"
+
+[[projects]]
+  branch = "master"
+  digest = "1:d51bf25874115cb888cf614aa2d248ff18fca48c2daf4c1dcc44a006402e7651"
+  name = "github.com/thebotguys/signalr"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "787ebe6729fc69294e8d385b21e795cff45a2bea"
+
+[[projects]]
+  branch = "master"
+  digest = "1:353557c4fac726379708abb00d6cfaefcf56f533ea0a63092736ddb91bac9df4"
+  name = "github.com/toorop/go-bittrex"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "b941be99f94f49cb0c552eb97ab46ff5fa6eac71"
 
 [[projects]]
   branch = "master"
@@ -112,8 +144,10 @@
   input-imports = [
     "github.com/adshao/go-binance",
     "github.com/gorilla/mux",
+    "github.com/jyap808/go-poloniex",
     "github.com/pkg/errors",
     "github.com/sirupsen/logrus",
+    "github.com/toorop/go-bittrex",
     "gopkg.in/redis.v3",
   ]
   solver-name = "gps-cdcl"

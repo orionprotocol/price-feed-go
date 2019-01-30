@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/batonych/tradingbot/exchanges/bittrex"
+
 	"github.com/batonych/tradingbot/api"
 	"github.com/batonych/tradingbot/exchanges/binance"
 	"github.com/batonych/tradingbot/logger"
@@ -20,6 +22,7 @@ const (
 // Config represents an application configuration.
 type Config struct {
 	Binance *binance.Config `json:"binance"`
+	Bittrex *bittrex.Config `json:"bittrex"`
 	Logger  *logger.Config  `json:"logger"`
 	API     *api.Config     `json:"api"`
 	Storage *storage.Config `json:"storage"`

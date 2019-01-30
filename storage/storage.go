@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/toorop/go-bittrex"
+
 	"github.com/adshao/go-binance"
 
 	"github.com/batonych/tradingbot/logger"
@@ -58,6 +60,11 @@ func New(cfg *Config, log *logger.Logger) *Client {
 // Check sends a ping to the database.
 func (c *Client) Check() (string, error) {
 	return c.client.Ping().Result()
+}
+
+func (c *Client) Flush() error {
+	_, err := c.client.FlushDb().Result()
+	return err
 }
 
 func (c *Client) LoadOrderBook(pair string) (models.OrderBookAPI, error) {
@@ -119,7 +126,7 @@ func (c *Client) LoadOrderBookInternal(symbol string, depth int) (models.OrderBo
 	return orderBook, nil
 }
 
-func (c *Client) LoadCandlestickList(symbol, interval string, timeStart, timeEnd int64) ([]models.Candle, error) {
+func (c *Client) LoadCandlestickListByExchange(exchange, symbol, interval string, timeStart, timeEnd int64) ([]models.Candle, error) {
 	var timeStartRounded, timeEndRounded time.Time
 	switch interval {
 	case "1d":
@@ -143,7 +150,7 @@ func (c *Client) LoadCandlestickList(symbol, interval string, timeStart, timeEnd
 
 	timeEndRounded = time.Unix(timeEnd, 0)
 
-	result, err := c.client.ZRangeByScoreWithScores(c.formatKey("candlestick", symbol, interval),
+	result, err := c.client.ZRangeByScoreWithScores(c.formatKey(exchange, "candlestick", symbol, interval),
 		redis.ZRangeByScore{
 			Min: strconv.FormatInt(timeStartRounded.Unix(), 10),
 			Max: strconv.FormatInt(timeEndRounded.Unix(), 10),
@@ -172,6 +179,154 @@ func (c *Client) LoadCandlestickList(symbol, interval string, timeStart, timeEnd
 	return candleList, nil
 }
 
+func (c *Client) LoadCandlestickListAll(symbol, interval string, timeStart, timeEnd int64) ([]models.Candle, error) {
+	var timeStartRounded, timeEndRounded time.Time
+	switch interval {
+	case "1d":
+		timeStartRounded = time.Unix(timeStart, 0).Truncate(day)
+	case "3d":
+		timeStartRounded = time.Unix(timeStart, 0).Truncate(threeDays)
+	case "1w":
+		timeStartRounded = time.Unix(timeStart, 0).Truncate(week)
+	case "1M":
+		timeStartDefault := time.Unix(timeStart, 0)
+		timeStartRounded = time.Date(timeStartDefault.Year(), timeStartDefault.Month(),
+			1, 0, 0, 0, int(millisecond), nil)
+	default:
+		intervalDuration, err := time.ParseDuration(interval)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse interval: %v", err)
+		}
+
+		timeStartRounded = time.Unix(timeStart, 0).Truncate(intervalDuration)
+	}
+
+	timeEndRounded = time.Unix(timeEnd, 0)
+
+	resultBinance, err := c.client.ZRangeByScoreWithScores(c.formatKey("binance", "candlestick", symbol, interval),
+		redis.ZRangeByScore{
+			Min: strconv.FormatInt(timeStartRounded.Unix(), 10),
+			Max: strconv.FormatInt(timeEndRounded.Unix(), 10),
+		}).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	resultBittrex, err := c.client.ZRangeByScoreWithScores(c.formatKey("bittrex", "candlestick", symbol, interval),
+		redis.ZRangeByScore{
+			Min: strconv.FormatInt(timeStartRounded.Unix(), 10),
+			Max: strconv.FormatInt(timeEndRounded.Unix(), 10),
+		}).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	resultPoloniex, err := c.client.ZRangeByScoreWithScores(c.formatKey("poloniex", "candlestick", symbol, interval),
+		redis.ZRangeByScore{
+			Min: strconv.FormatInt(timeStartRounded.Unix(), 10),
+			Max: strconv.FormatInt(timeEndRounded.Unix(), 10),
+		}).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	candleList := make([]models.Candle, 0)
+	counts := make(map[int64]int)
+	indexes := make(map[int64]int)
+
+	for _, v := range resultBinance {
+		str, ok := v.Member.(string)
+		if !ok {
+			return nil, fmt.Errorf("%v is not string, but %v", v.Member, v.Member)
+		}
+
+		var ob models.Candle
+		if err = json.Unmarshal([]byte(str), &ob); err != nil {
+			return nil, fmt.Errorf("could not unmarshal %v: %v", str, err)
+		}
+
+		counts[ob.TimeStart]++
+		indexes[ob.TimeStart] = len(candleList)
+		candleList = append(candleList, ob)
+	}
+
+	for _, v := range resultBittrex {
+		str, ok := v.Member.(string)
+		if !ok {
+			return nil, fmt.Errorf("%v is not string, but %v", v.Member, v.Member)
+		}
+
+		var ob models.Candle
+		if err = json.Unmarshal([]byte(str), &ob); err != nil {
+			return nil, fmt.Errorf("could not unmarshal %v: %v", str, err)
+		}
+
+		counts[ob.TimeStart]++
+
+		r, ok := indexes[ob.TimeStart]
+		if !ok {
+			indexes[ob.TimeStart] = len(candleList)
+			candleList = append(candleList, ob)
+			continue
+		}
+
+		if ob.High > candleList[r].High {
+			candleList[r].High = ob.High
+		}
+
+		if ob.Low < candleList[r].Low {
+			candleList[r].Low = ob.Low
+		}
+
+		candleList[r].Volume += ob.Volume
+		candleList[r].Open = (candleList[r].Open + ob.Open) / 2
+		candleList[r].Close = (candleList[r].Close + ob.Close) / 2
+	}
+
+	for _, v := range resultPoloniex {
+		str, ok := v.Member.(string)
+		if !ok {
+			return nil, fmt.Errorf("%v is not string, but %v", v.Member, v.Member)
+		}
+
+		var ob models.Candle
+		if err = json.Unmarshal([]byte(str), &ob); err != nil {
+			return nil, fmt.Errorf("could not unmarshal %v: %v", str, err)
+		}
+
+		counts[ob.TimeStart]++
+
+		r, ok := indexes[ob.TimeStart]
+		if !ok {
+			indexes[ob.TimeStart] = len(candleList)
+			candleList = append(candleList, ob)
+			continue
+		}
+
+		if ob.High > candleList[r].High {
+			candleList[r].High = ob.High
+		}
+
+		if ob.Low > candleList[r].Low {
+			candleList[r].Low = ob.Low
+		}
+
+		candleList[r].Volume += ob.Volume
+
+		if counts[ob.TimeStart] == 1 {
+			candleList[r].Open = (candleList[r].Open + ob.Open) / 2
+			candleList[r].Close = (candleList[r].Close + ob.Close) / 2
+		}
+		if counts[ob.TimeStart] == 2 {
+			candleList[r].Open = (candleList[r].Open*2 + ob.Open) / 3
+			candleList[r].Close = (candleList[r].Close*2 + ob.Close) / 3
+		}
+	}
+
+	c.log.Debugf("LoadCandlestickList result: %+v", candleList)
+	return candleList, nil
+}
+
 func (c *Client) StoreOrderBookInternal(symbol string, orderBook models.OrderBookInternal) error {
 	data, err := json.Marshal(orderBook)
 	if err != nil {
@@ -186,7 +341,7 @@ func (c *Client) StoreOrderBookInternal(symbol string, orderBook models.OrderBoo
 	return c.store(c.formatKey("orderBook", symbol), float64(time.Now(). /*.Round(roundTime)*/ Unix()), string(data))
 }
 
-func (c *Client) StoreCandlestick(symbol, interval string, candlestick *binance.WsKlineEvent) error {
+func (c *Client) StoreCandlestickBinance(symbol, interval string, candlestick *binance.WsKlineEvent) error {
 	candle := models.CandleFromEvent(candlestick)
 
 	data, err := json.Marshal(candle)
@@ -195,26 +350,37 @@ func (c *Client) StoreCandlestick(symbol, interval string, candlestick *binance.
 		return err
 	}
 
-	return c.storeCandlestick(symbol, interval, candle.TimeStart, data)
+	return c.storeCandlestick("binance", symbol, interval, candle.TimeStart, data)
 }
 
-func (c *Client) StoreCandlestickAPI(symbol, interval string, candlestick *binance.Kline) error {
-	candle := models.CandleFromAPI(candlestick)
+func (c *Client) StoreCandlestickBinanceAPI(symbol, interval string, candlestick *binance.Kline) error {
+	candle := models.CandleFromBinanceAPI(candlestick)
 	data, err := json.Marshal(candle)
 	if err != nil {
 		c.log.Errorf("Could not marshal candlestick: %v", err)
 		return err
 	}
 
-	return c.storeCandlestick(symbol, interval, candle.TimeStart, data)
+	return c.storeCandlestick("binance", symbol, interval, candle.TimeStart, data)
 }
 
-func (c *Client) storeCandlestick(symbol, interval string, openTime int64, candlestick []byte) error {
-	if err := c.purge(c.formatKey("candlestick", symbol, interval), openTime, openTime); err != nil {
+func (c *Client) StoreCandlestickBittrexAPI(symbol, interval string, candlestick *bittrex.Candle) error {
+	candle := models.CandleFromBittrexAPI(candlestick)
+	data, err := json.Marshal(candle)
+	if err != nil {
+		c.log.Errorf("Could not marshal candlestick: %v", err)
 		return err
 	}
 
-	return c.store(c.formatKey("candlestick", symbol, interval), float64(openTime), string(candlestick))
+	return c.storeCandlestick("bittrex", models.BittrexSymbolToBinance(symbol), interval, candle.TimeStart, data)
+}
+
+func (c *Client) storeCandlestick(exchange, symbol, interval string, openTime int64, candlestick []byte) error {
+	if err := c.purge(c.formatKey(exchange, "candlestick", symbol, interval), openTime, openTime); err != nil {
+		return err
+	}
+
+	return c.store(c.formatKey(exchange, "candlestick", symbol, interval), float64(openTime), string(candlestick))
 }
 
 // store adds a new value and score in a sorted set with specified key.

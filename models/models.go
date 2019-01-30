@@ -5,11 +5,13 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/toorop/go-bittrex"
+
 	"github.com/adshao/go-binance"
 )
 
 var (
-	CandlestickIntervalList = []string{
+	BinanceCandlestickIntervalList = []string{
 		"1m",
 		"3m",
 		"5m",
@@ -26,10 +28,31 @@ var (
 		"1w",
 		"1M",
 	}
+
+	BittrexCandlestickIntervalList = []string{
+		"oneMin", "fiveMin", "thirtyMin", "hour", "day",
+	}
 )
 
+func BittrexIntervalToBinance(v string) string {
+	switch v {
+	case "oneMin":
+		return "1m"
+	case "fiveMin":
+		return "5m"
+	case "thirtyMin":
+		return "30m"
+	case "hour":
+		return "1h"
+	case "day":
+		return "1d"
+	}
+
+	return ""
+}
+
 func IsValidInterval(s string) bool {
-	for _, v := range CandlestickIntervalList {
+	for _, v := range BinanceCandlestickIntervalList {
 		if v == s {
 			return true
 		}
@@ -232,7 +255,7 @@ func CandleFromEvent(event *binance.WsKlineEvent) *Candle {
 	}
 }
 
-func CandleFromAPI(candlestick *binance.Kline) *Candle {
+func CandleFromBinanceAPI(candlestick *binance.Kline) *Candle {
 	return &Candle{
 		TimeStart: candlestick.OpenTime / 1000,
 		TimeEnd:   candlestick.CloseTime / 1000,
@@ -245,7 +268,78 @@ func CandleFromAPI(candlestick *binance.Kline) *Candle {
 	}
 }
 
+func CandleFromBittrexAPI(candlestick *bittrex.Candle) *Candle {
+	open, _ := candlestick.Open.Float64()
+	close, _ := candlestick.Close.Float64()
+	low, _ := candlestick.Low.Float64()
+	high, _ := candlestick.High.Float64()
+	volume, _ := candlestick.Volume.Float64()
+
+	return &Candle{
+		TimeStart: candlestick.TimeStamp.Unix(),
+		TimeEnd:   candlestick.TimeStamp.Unix(),
+		Time:      time.Now().Unix(),
+		Open:      open,
+		Close:     close,
+		High:      high,
+		Low:       low,
+		Volume:    volume,
+	}
+}
+
 func mustParseFloat64(s string) float64 {
 	val, _ := strconv.ParseFloat(s, 64)
 	return val
+}
+
+var BittrexSymbols = []string{
+	"BTC-LTC", "BTC-ETH", "BTC-DASH", "BTC-ZEC", "BTC-BCH", "BTC-BSV",
+	"ETH-LTC", "ETH-DASH", "ETH-ZEC",
+	"USD-BTC", "USD-LTC", "USD-ETH", "USD-BCH", "USD-BSV",
+}
+
+var BinanceSymbols = []string{
+	"LTCBTC", "ETHBTC", "DASHBTC", "ZECBTC", "BCHABCBTC", "BCHSVBTC",
+	"LTCETH", "DASHETH", "ZECETH",
+	"BTCUSDT", "LTCUSDT", "ETHUSDT", "BCHABCUSDT", "BCHSVUSDT",
+}
+
+var PoloniexSymbols = []string{
+	"btc-ltc", "btc-eth", "btc-dash", "btc-zec", "btc-bch", "btc-bsv",
+	"eth-ltc", "eth-dash", "eth-zec",
+	"usd-btc", "usd-ltc", "usd-eth", "usd-bch", "usd-bsv",
+}
+
+func BittrexSymbolToBinance(symbol string) string {
+	switch symbol {
+	case "BTC-LTC":
+		return "LTCBTC"
+	case "BTC-ETH":
+		return "ETHBTC"
+	case "BTC-DASH":
+		return "DASHBTC"
+	case "BTC-ZEC":
+		return "ZECBTC"
+	case "BTC-BCH":
+		return "BCHABCBTC"
+	case "BTC-BSV":
+		return "BCHSVBTC"
+	case "ETH-LTC":
+		return "LTCETH"
+	case "ETH-DASH":
+		return "DASHETH"
+	case "ETH-ZEC":
+		return "ZECETH"
+	case "USD-BTC":
+		return "BTCUSDT"
+	case "USD-LTC":
+		return "LTCUSDT"
+	case "USD-ETH":
+		return "ETHUSDT"
+	case "USD-BCH":
+		return "BCHABCUSDT"
+	case "USD-BSV":
+		return "BCHSVUSDT"
+	}
+	return ""
 }

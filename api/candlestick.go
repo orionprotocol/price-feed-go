@@ -54,10 +54,20 @@ func (api *API) handleCandlestickRequest(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	candles, err := api.storage.LoadCandlestickList(symbol, interval, timeStart, timeEnd)
-	if err != nil {
-		http.Error(w, "no pair specified", http.StatusBadRequest)
-		return
+	var candles []models.Candle
+	exchange, ok := vars["exchange"]
+	if !ok || len(exchange) == 0 {
+		candles, err = api.storage.LoadCandlestickListAll(symbol, interval, timeStart, timeEnd)
+		if err != nil {
+			http.Error(w, "no pair specified", http.StatusBadRequest)
+			return
+		}
+	} else {
+		candles, err = api.storage.LoadCandlestickListByExchange(exchange[0], symbol, interval, timeStart, timeEnd)
+		if err != nil {
+			http.Error(w, "no pair specified", http.StatusBadRequest)
+			return
+		}
 	}
 
 	response := models.CandlestickResponse{

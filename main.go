@@ -5,6 +5,8 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/batonych/tradingbot/exchanges/bittrex"
+
 	"github.com/batonych/tradingbot/api"
 	"github.com/batonych/tradingbot/config"
 	"github.com/batonych/tradingbot/exchanges/binance"
@@ -35,12 +37,23 @@ func main() {
 	}
 	l.Infof("Database check reply: %v", pong)
 
+	if err := database.Flush(); err != nil {
+		l.Fatalf("Could not flush database")
+	}
+
 	binanceWorker, err := binance.NewWorker(cfg.Binance, l, database, quit)
 	if err != nil {
 		l.Fatalf("Could not connect to Binance: %v", err)
 	}
 
 	binanceWorker.Start()
+
+	bittrexWorker, err := bittrex.NewWorker(cfg.Bittrex, l, database, quit)
+	if err != nil {
+		l.Fatalf("Could not connect to Bittrex: %v", err)
+	}
+
+	bittrexWorker.Start()
 
 	apiServer := api.New(cfg.API, l, database, binanceWorker)
 
