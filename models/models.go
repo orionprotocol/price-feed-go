@@ -330,19 +330,19 @@ func mustParseFloat64(s string) float64 {
 }
 
 var BinanceSymbols = []string{
-	"LTCBTC", "ETHBTC", "DASHBTC", "ZECBTC", "BCHABCBTC", "BCHSVBTC",
+	"LTCBTC", "ETHBTC", "DASHBTC", "ZECBTC", "BCHABCBTC", "BCHSVBTC", "XRPBTC", "WAVESBTC",
 	"LTCETH", "DASHETH", "ZECETH",
 	"BTCUSDT", "LTCUSDT", "ETHUSDT", "BCHABCUSDT", "BCHSVUSDT",
 }
 
 var BittrexSymbols = []string{
-	"BTC-LTC", "BTC-ETH", "BTC-DASH", "BTC-ZEC", "BTC-BCH", "BTC-BSV",
+	"BTC-LTC", "BTC-ETH", "BTC-DASH", "BTC-ZEC", "BTC-BCH", "BTC-BSV", "BTC-XRP", "BTC-WAVES",
 	"ETH-LTC", "ETH-DASH", "ETH-ZEC",
 	"USD-BTC", "USD-LTC", "USD-ETH", "USD-BCH", "USD-BSV",
 }
 
 var PoloniexSymbols = []string{
-	"BTC_LTC", "BTC_ETH", "BTC_DASH", "BTC_ZEC", "BTC_BCH",
+	"BTC_LTC", "BTC_ETH", "BTC_DASH", "BTC_ZEC", "BTC_BCH", "BTC_XRP",
 	"ETH_ZEC",
 	"USDT_BTC", "USDT_LTC", "USDT_ETH", "USDT_BCH",
 }
@@ -361,6 +361,10 @@ func BittrexSymbolToBinance(symbol string) string {
 		return "BCHABCBTC"
 	case "BTC-BSV":
 		return "BCHSVBTC"
+	case "BTC-XRP":
+		return "XRPBTC"
+	case "BTC-WAVES":
+		return "WAVESBTC"
 	case "ETH-LTC":
 		return "LTCETH"
 	case "ETH-DASH":
@@ -393,6 +397,10 @@ func PoloniexSymbolToBinance(v string) string {
 		return "ZECBTC"
 	case "BTC_BCH":
 		return "BCHABCBTC"
+	case "BTC_XRP":
+		return "XRPBTC"
+	case "BTC_WAVES":
+		return "WAVESBTC"
 	case "ETH_ZEC":
 		return "ZECETH"
 	case "USDT_BTC":
