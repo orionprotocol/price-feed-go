@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jyap808/go-poloniex"
+
 	"github.com/toorop/go-bittrex"
 
 	"github.com/adshao/go-binance"
@@ -373,6 +375,17 @@ func (c *Client) StoreCandlestickBittrexAPI(symbol, interval string, candlestick
 	}
 
 	return c.storeCandlestick("bittrex", models.BittrexSymbolToBinance(symbol), interval, candle.TimeStart, data)
+}
+
+func (c *Client) StoreCandlestickPoloniexAPI(symbol, interval string, candlestick *poloniex.CandleStick) error {
+	candle := models.CandleFromPoloniexApi(candlestick)
+	data, err := json.Marshal(candle)
+	if err != nil {
+		c.log.Errorf("Could not marshal candlestick: %v", err)
+		return err
+	}
+
+	return c.storeCandlestick("poloniex", models.PoloniexSymbolToBinance(symbol), interval, candle.TimeStart, data)
 }
 
 func (c *Client) storeCandlestick(exchange, symbol, interval string, openTime int64, candlestick []byte) error {

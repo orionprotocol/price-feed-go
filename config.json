@@ -8,6 +8,10 @@
     "request_interval": "1s"
   },
 
+  "poloniex": {
+    "request_interval": "1s"
+  },
+
   "logger": {
     "level": "debug",
     "to_stdout": true,

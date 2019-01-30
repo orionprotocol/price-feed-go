@@ -5,6 +5,8 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/batonych/tradingbot/exchanges/poloniex"
+
 	"github.com/batonych/tradingbot/exchanges/bittrex"
 
 	"github.com/batonych/tradingbot/api"
@@ -54,6 +56,13 @@ func main() {
 	}
 
 	bittrexWorker.Start()
+
+	poloniexWorker, err := poloniex.NewWorker(cfg.Poloniex, l, database, quit)
+	if err != nil {
+		l.Fatalf("Could not connect to Bittrex: %v", err)
+	}
+
+	poloniexWorker.Start()
 
 	apiServer := api.New(cfg.API, l, database, binanceWorker)
 
