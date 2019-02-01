@@ -3,6 +3,7 @@ package storage
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"math/big"
 	"strconv"
 	"strings"
@@ -28,6 +29,7 @@ const (
 	threeDays             = 3 * day
 	week                  = 7 * day
 	millisecond           = 1 * time.Millisecond
+	precision             = 8
 )
 
 // Config represents a database configuration.
@@ -280,9 +282,9 @@ func (c *Client) LoadCandlestickListAll(symbol, interval string, timeStart, time
 			candleList[r].Low = ob.Low
 		}
 
-		candleList[r].Volume += ob.Volume
-		candleList[r].Open = (candleList[r].Open + ob.Open) / 2
-		candleList[r].Close = (candleList[r].Close + ob.Close) / 2
+		candleList[r].Volume = toFixed(candleList[r].Volume + ob.Volume)
+		candleList[r].Open = toFixed((candleList[r].Open + ob.Open) / 2)
+		candleList[r].Close = toFixed((candleList[r].Close + ob.Close) / 2)
 	}
 
 	for _, v := range resultPoloniex {
@@ -313,15 +315,15 @@ func (c *Client) LoadCandlestickListAll(symbol, interval string, timeStart, time
 			candleList[r].Low = ob.Low
 		}
 
-		candleList[r].Volume += ob.Volume
+		candleList[r].Volume = toFixed(candleList[r].Volume + ob.Volume)
 
 		if counts[ob.TimeStart] == 1 {
-			candleList[r].Open = (candleList[r].Open + ob.Open) / 2
-			candleList[r].Close = (candleList[r].Close + ob.Close) / 2
+			candleList[r].Open = toFixed((candleList[r].Open + ob.Open) / 2)
+			candleList[r].Close = toFixed((candleList[r].Close + ob.Close) / 2)
 		}
 		if counts[ob.TimeStart] == 2 {
-			candleList[r].Open = (candleList[r].Open*2 + ob.Open) / 3
-			candleList[r].Close = (candleList[r].Close*2 + ob.Close) / 3
+			candleList[r].Open = toFixed((candleList[r].Open*2 + ob.Open) / 3)
+			candleList[r].Close = toFixed((candleList[r].Close*2 + ob.Close) / 3)
 		}
 	}
 
@@ -446,4 +448,13 @@ func (c *Client) formatKey(args ...interface{}) string {
 		}
 	}
 	return strings.Join(s, ":")
+}
+
+func round(num float64) int {
+	return int(num + math.Copysign(0.5, num))
+}
+
+func toFixed(x float64) float64 {
+	output := math.Pow(10, float64(precision))
+	return float64(round(x*output)) / output
 }
