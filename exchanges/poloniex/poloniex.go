@@ -56,6 +56,17 @@ func (w *Worker) Start() {
 	}
 }
 
+func (w *Worker) Reload() {
+	for _, symbol := range w.symbols {
+		for _, v := range models.PoloniexCandlestickIntervalList {
+			go func(s int) {
+				w.initCandlesticks(symbol, s)
+			}(v)
+		}
+	}
+	w.log.Infof("Poloniex cache reloaded")
+}
+
 func (w *Worker) SubscribeCandlestickAll(symbol string) {
 	for _, v := range models.PoloniexCandlestickIntervalList {
 		go func(s int) {

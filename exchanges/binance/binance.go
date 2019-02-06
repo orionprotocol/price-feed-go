@@ -99,156 +99,156 @@ func NewWorker(config *Config, log *logger.Logger, database *storage.Client, qui
 }
 
 // Start starts a new Binance worker.
-func (b *Worker) Start() {
-	for _, symbol := range b.symbols {
+func (w *Worker) Start() {
+	for _, symbol := range w.symbols {
 		go func(symbol string) {
-			err := b.SubscribeOrderBook(symbol)
+			err := w.SubscribeOrderBook(symbol)
 			if err != nil {
-				b.log.Printf("Couldn't get diff depths on symbol %s: %v", symbol, err)
+				w.log.Printf("Couldn't get diff depths on symbol %s: %v", symbol, err)
 			}
 		}(symbol)
-		go b.SubscribeCandlestickAll(symbol)
+		go w.SubscribeCandlestickAll(symbol)
 	}
 }
 
-func (b *Worker) GetOrderBook(symbol string) (models.OrderBookInternal, bool) {
-	b.orderBookCacheMu.Lock()
-	defer b.orderBookCacheMu.Unlock()
+func (w *Worker) GetOrderBook(symbol string) (models.OrderBookInternal, bool) {
+	w.orderBookCacheMu.Lock()
+	defer w.orderBookCacheMu.Unlock()
 
-	ob, ok := b.orderBookCache[symbol]
+	ob, ok := w.orderBookCache[symbol]
 	return ob, ok
 }
 
-func (b *Worker) AggTrades(symbol string) error {
+func (w *Worker) AggTrades(symbol string) error {
 	wsAggTradesHandler := func(event *binance.WsAggTradeEvent) {
-		b.AggTradesC <- event
+		w.AggTradesC <- event
 	}
 
-	doneC, stopC, err := binance.WsAggTradeServe(symbol, wsAggTradesHandler, b.makeErrorHandler())
+	doneC, stopC, err := binance.WsAggTradeServe(symbol, wsAggTradesHandler, w.makeErrorHandler())
 	if err != nil {
 		return err
 	}
 
-	b.dones = append(b.dones, doneC)
-	b.stops = append(b.stops, stopC)
+	w.dones = append(w.dones, doneC)
+	w.stops = append(w.stops, stopC)
 
 	return nil
 }
 
-func (b *Worker) Klines(symbol, interval string) error {
+func (w *Worker) Klines(symbol, interval string) error {
 	wsKlineHandler := func(event *binance.WsKlineEvent) {
-		b.KlinesC <- event
+		w.KlinesC <- event
 	}
-	doneC, stopC, err := binance.WsKlineServe(symbol, interval, wsKlineHandler, b.makeErrorHandler())
+	doneC, stopC, err := binance.WsKlineServe(symbol, interval, wsKlineHandler, w.makeErrorHandler())
 	if err != nil {
 		return err
 	}
 
-	b.dones = append(b.dones, doneC)
-	b.stops = append(b.stops, stopC)
+	w.dones = append(w.dones, doneC)
+	w.stops = append(w.stops, stopC)
 
 	return nil
 }
 
-func (b *Worker) Trades(symbol string) error {
+func (w *Worker) Trades(symbol string) error {
 	wsTradesHandler := func(event *binance.WsTradeEvent) {
-		b.TradesC <- event
+		w.TradesC <- event
 	}
-	doneC, stopC, err := binance.WsTradeServe(symbol, wsTradesHandler, b.makeErrorHandler())
+	doneC, stopC, err := binance.WsTradeServe(symbol, wsTradesHandler, w.makeErrorHandler())
 	if err != nil {
 		return err
 	}
 
-	b.dones = append(b.dones, doneC)
-	b.stops = append(b.stops, stopC)
+	w.dones = append(w.dones, doneC)
+	w.stops = append(w.stops, stopC)
 
 	return nil
 }
 
-func (b *Worker) AllMarketMiniTickers() error {
+func (w *Worker) AllMarketMiniTickers() error {
 	wsAllMarketMiniTickersHandler := func(event binance.WsAllMiniMarketsStatEvent) {
-		b.AllMarketMiniTickersC <- event
+		w.AllMarketMiniTickersC <- event
 	}
-	doneC, stopC, err := binance.WsAllMiniMarketsStatServe(wsAllMarketMiniTickersHandler, b.makeErrorHandler())
+	doneC, stopC, err := binance.WsAllMiniMarketsStatServe(wsAllMarketMiniTickersHandler, w.makeErrorHandler())
 	if err != nil {
 		return err
 	}
 
-	b.dones = append(b.dones, doneC)
-	b.stops = append(b.stops, stopC)
+	w.dones = append(w.dones, doneC)
+	w.stops = append(w.stops, stopC)
 
 	return nil
 }
 
-func (b *Worker) AllMarketTickers() error {
+func (w *Worker) AllMarketTickers() error {
 	wsAllMarketTickersHandler := func(event binance.WsAllMarketsStatEvent) {
-		b.AllMarketTickersC <- event
+		w.AllMarketTickersC <- event
 	}
-	doneC, stopC, err := binance.WsAllMarketsStatServe(wsAllMarketTickersHandler, b.makeErrorHandler())
+	doneC, stopC, err := binance.WsAllMarketsStatServe(wsAllMarketTickersHandler, w.makeErrorHandler())
 	if err != nil {
 		return err
 	}
 
-	b.dones = append(b.dones, doneC)
-	b.stops = append(b.stops, stopC)
+	w.dones = append(w.dones, doneC)
+	w.stops = append(w.stops, stopC)
 
 	return nil
 }
 
-func (b *Worker) PartialBookDepths(symbol, levels string) error {
+func (w *Worker) PartialBookDepths(symbol, levels string) error {
 	wsPartialBookDepthsHandler := func(event *binance.WsPartialDepthEvent) {
-		b.PartialBookDepthsC <- event
+		w.PartialBookDepthsC <- event
 	}
-	doneC, stopC, err := binance.WsPartialDepthServe(symbol, levels, wsPartialBookDepthsHandler, b.makeErrorHandler())
+	doneC, stopC, err := binance.WsPartialDepthServe(symbol, levels, wsPartialBookDepthsHandler, w.makeErrorHandler())
 	if err != nil {
 		return err
 	}
 
-	b.dones = append(b.dones, doneC)
-	b.stops = append(b.stops, stopC)
+	w.dones = append(w.dones, doneC)
+	w.stops = append(w.stops, stopC)
 
 	return nil
 }
 
-func (b *Worker) DiffDepths(symbol string) error {
+func (w *Worker) DiffDepths(symbol string) error {
 	wsDiffDepthsHandler := func(event *binance.WsDepthEvent) {
-		b.DiffDepthsC <- event
+		w.DiffDepthsC <- event
 	}
-	doneC, stopC, err := binance.WsDepthServe(symbol, wsDiffDepthsHandler, b.makeErrorHandler())
+	doneC, stopC, err := binance.WsDepthServe(symbol, wsDiffDepthsHandler, w.makeErrorHandler())
 	if err != nil {
 		return err
 	}
 
-	b.dones = append(b.dones, doneC)
-	b.stops = append(b.stops, stopC)
+	w.dones = append(w.dones, doneC)
+	w.stops = append(w.stops, stopC)
 
 	return nil
 }
 
 // https://github.com/binance-exchange/binance-official-api-docs/blob/master/web-socket-streams.md#how-to-manage-a-local-order-book-correctly
-func (b *Worker) SubscribeOrderBook(symbol string) error {
-	for ; ; <-time.Tick(b.requestInterval) {
+func (w *Worker) SubscribeOrderBook(symbol string) error {
+	for ; ; <-time.Tick(w.requestInterval) {
 		// Get a depth snapshot from https://www.binance.com/api/v1/depth?symbol=BNBBTC&limit=1000
-		orderBook, err := b.getOrderBook(symbol, orderBookMaxLimit)
+		orderBook, err := w.getOrderBook(symbol, orderBookMaxLimit)
 
 		// b.log.Debugf("Got order book for symbol %v: %+v", symbol, orderBook)
 
 		if err != nil {
 			return errors.Wrapf(err, "could not get order book")
 		}
-		b.orderBookCacheMu.Lock()
-		b.orderBookCache[symbol] = orderBook
-		b.orderBookCacheMu.Unlock()
+		w.orderBookCacheMu.Lock()
+		w.orderBookCache[symbol] = orderBook
+		w.orderBookCacheMu.Unlock()
 
 		// Buffer the events you receive from the stream
 		wsDiffDepthsHandler := func(event *binance.WsDepthEvent) {
-			if err = b.updateOrderBook(symbol, event); err != nil {
-				b.log.Errorf("Could not update order book: %v", err)
+			if err = w.updateOrderBook(symbol, event); err != nil {
+				w.log.Errorf("Could not update order book: %v", err)
 			}
 		}
 
 		// Open a stream to wss://stream.binance.com:9443/ws/bnbbtc@depth
-		doneC, _, err := binance.WsDepthServe(symbol, wsDiffDepthsHandler, b.makeErrorHandler())
+		doneC, _, err := binance.WsDepthServe(symbol, wsDiffDepthsHandler, w.makeErrorHandler())
 		if err != nil {
 			return err
 		}
@@ -257,46 +257,57 @@ func (b *Worker) SubscribeOrderBook(symbol string) error {
 	}
 }
 
-func (b *Worker) SubscribeCandlestickAll(symbol string) {
+func (w *Worker) Reload() {
+	for _, symbol := range w.symbols {
+		for _, v := range models.BinanceCandlestickIntervalList {
+			go func(s string) {
+				w.initCandlesticks(symbol, s)
+			}(v)
+		}
+	}
+	w.log.Infof("Binance cache reloaded")
+}
+
+func (w *Worker) SubscribeCandlestickAll(symbol string) {
 	for _, v := range models.BinanceCandlestickIntervalList {
 		go func(s string) {
-			b.initCandlesticks(symbol, s)
+			w.initCandlesticks(symbol, s)
 
-			if err := b.SubscribeCandlestick(symbol, s); err != nil {
-				b.log.Errorf("Could not subscribe to candlestick interval %v symbol %v: %v", v, symbol, err)
+			if err := w.SubscribeCandlestick(symbol, s); err != nil {
+				w.log.Errorf("Could not subscribe to candlestick interval %v symbol %v: %v", v, symbol, err)
 			}
 		}(v)
 	}
 }
 
-func (b *Worker) initCandlesticks(symbol, interval string) {
+func (w *Worker) initCandlesticks(symbol, interval string) {
 	client := binance.NewClient("", "")
 	candlesticks, err := client.NewKlinesService().Symbol(symbol).
 		Interval(interval).Limit(candlestickLimit).Do(context.Background())
 	if err != nil {
-		b.log.Errorf("Could not load candlesticks from REST API with interval %v and symbol %v: %v",
+		w.log.Errorf("Could not load candlesticks from REST API with interval %v and symbol %v: %v",
 			interval, symbol, err)
 
 		return
 	}
 
 	for _, k := range candlesticks {
-		if err := b.updateCandlestickAPI(symbol, interval, k); err != nil {
-			b.log.Errorf("Could not update candlesticks from REST API: %v", err)
+		if err := w.updateCandlestickAPI(symbol, interval, k); err != nil {
+			w.log.Errorf("Could not update candlesticks from REST API: %v", err)
 		}
 	}
 }
 
-func (b *Worker) SubscribeCandlestick(symbol, interval string) error {
-	for ; ; <-time.Tick(b.requestInterval) {
+func (w *Worker) SubscribeCandlestick(symbol, interval string) error {
+	for ; ; <-time.Tick(w.requestInterval) {
 		wsCandlestickHandler := func(event *binance.WsKlineEvent) {
-			if err := b.updateCandlestick(symbol, interval, event); err != nil {
-				b.log.Errorf("Could not update order book: %v", err)
+			if err := w.updateCandlestick(symbol, interval, event); err != nil {
+				w.log.Errorf("Could not update order book: %v", err)
 			}
 		}
 
 		// Open a stream to wss://stream.binance.com:9443/ws/bnbbtc@depth
-		doneC, _, err := binance.WsKlineServe(symbol, interval, wsCandlestickHandler, b.makeErrorHandler())
+		doneC, _, err := binance.WsKlineServe(symbol, interval, wsCandlestickHandler, w.makeErrorHandler())
 		if err != nil {
 			return err
 		}
@@ -305,77 +316,77 @@ func (b *Worker) SubscribeCandlestick(symbol, interval string) error {
 	}
 }
 
-func (b *Worker) updateOrderBook(symbol string, event *binance.WsDepthEvent) error {
-	b.orderBookCacheMu.Lock()
-	defer b.orderBookCacheMu.Unlock()
+func (w *Worker) updateOrderBook(symbol string, event *binance.WsDepthEvent) error {
+	w.orderBookCacheMu.Lock()
+	defer w.orderBookCacheMu.Unlock()
 
 	// Drop any event where u is <= lastUpdateId in the snapshot
-	if event.UpdateID <= b.orderBookCache[symbol].LastUpdateID {
+	if event.UpdateID <= w.orderBookCache[symbol].LastUpdateID {
 		return nil
 	}
 
 	for _, bid := range event.Bids {
 		if bid.Quantity == zero {
 			// b.log.Debugf("deleting bid with price %v for symbol %v", bid.Price, symbol)
-			delete(b.orderBookCache[symbol].Bids, bid.Price)
+			delete(w.orderBookCache[symbol].Bids, bid.Price)
 			continue
 		}
 
-		b.orderBookCache[symbol].Bids[bid.Price] = bid.Quantity
+		w.orderBookCache[symbol].Bids[bid.Price] = bid.Quantity
 	}
 
 	for _, ask := range event.Asks {
 		if ask.Quantity == zero {
 			// b.log.Debugf("deleting ask with price %v for symbol %v", ask.Price, symbol)
-			delete(b.orderBookCache[symbol].Asks, ask.Price)
+			delete(w.orderBookCache[symbol].Asks, ask.Price)
 			continue
 		}
 
-		b.orderBookCache[symbol].Asks[ask.Price] = ask.Quantity
+		w.orderBookCache[symbol].Asks[ask.Price] = ask.Quantity
 	}
 
-	if err := b.database.StoreOrderBookInternal(symbol, b.orderBookCache[symbol]); err != nil {
-		b.log.Errorf("Could not store order book to database: %v", err)
-	}
-
-	return nil
-}
-
-func (b *Worker) updateCandlestick(symbol, interval string, event *binance.WsKlineEvent) error {
-	if err := b.database.StoreCandlestickBinance(symbol, interval, event); err != nil {
-		b.log.Errorf("Could not store candlestick to database: %v", err)
+	if err := w.database.StoreOrderBookInternal(symbol, w.orderBookCache[symbol]); err != nil {
+		w.log.Errorf("Could not store order book to database: %v", err)
 	}
 
 	return nil
 }
 
-func (b *Worker) updateCandlestickAPI(symbol, interval string, candlestick *binance.Kline) error {
-	if err := b.database.StoreCandlestickBinanceAPI(symbol, interval, candlestick); err != nil {
-		b.log.Errorf("Could not store candlestick from REST API to database: %v", err)
+func (w *Worker) updateCandlestick(symbol, interval string, event *binance.WsKlineEvent) error {
+	if err := w.database.StoreCandlestickBinance(symbol, interval, event); err != nil {
+		w.log.Errorf("Could not store candlestick to database: %v", err)
 	}
 
 	return nil
 }
 
-func (b *Worker) StopAll() {
-	for _, c := range b.stops {
+func (w *Worker) updateCandlestickAPI(symbol, interval string, candlestick *binance.Kline) error {
+	if err := w.database.StoreCandlestickBinanceAPI(symbol, interval, candlestick); err != nil {
+		w.log.Errorf("Could not store candlestick from REST API to database: %v", err)
+	}
+
+	return nil
+}
+
+func (w *Worker) StopAll() {
+	for _, c := range w.stops {
 		c <- struct{}{}
 	}
 
-	for _, c := range b.dones {
+	for _, c := range w.dones {
 		<-c
 	}
 
-	b.StopC <- struct{}{}
+	w.StopC <- struct{}{}
 }
 
-func (b *Worker) makeErrorHandler() binance.ErrHandler {
+func (w *Worker) makeErrorHandler() binance.ErrHandler {
 	return func(err error) {
-		b.log.Printf("Error in WS connection with Binance: %v", err)
+		w.log.Printf("Error in WS connection with Binance: %v", err)
 	}
 }
 
-func (b *Worker) fillSymbolList() error {
+func (w *Worker) fillSymbolList() error {
 	resp, err := http.Get(priceURL)
 	if err != nil {
 		return err
@@ -400,19 +411,19 @@ func (b *Worker) fillSymbolList() error {
 		symbols = append(symbols, item.Symbol)
 	}
 
-	b.log.Infof("Working with %v symbols on Binance", len(symbols))
+	w.log.Infof("Working with %v symbols on Binance", len(symbols))
 
-	b.symbols = symbols
+	w.symbols = symbols
 	return nil
 }
 
-func (b *Worker) fillSymbolListWithTestData() error {
-	b.symbols = models.BinanceSymbols
+func (w *Worker) fillSymbolListWithTestData() error {
+	w.symbols = models.BinanceSymbols
 	return nil
 }
 
-func (b *Worker) getOrderBook(symbol string, depth int) (response models.OrderBookInternal, err error) {
-	orderBookURL, err := b.makeOrderBookURL(symbol, depth)
+func (w *Worker) getOrderBook(symbol string, depth int) (response models.OrderBookInternal, err error) {
+	orderBookURL, err := w.makeOrderBookURL(symbol, depth)
 	if err != nil {
 		return models.OrderBookInternal{}, errors.Wrapf(err, "could not make order book URL")
 	}
@@ -437,7 +448,7 @@ func (b *Worker) getOrderBook(symbol string, depth int) (response models.OrderBo
 	return models.SerializeBinanceOrderBookREST(data), nil
 }
 
-func (b *Worker) makeOrderBookURL(symbol string, depth int) (string, error) {
+func (w *Worker) makeOrderBookURL(symbol string, depth int) (string, error) {
 	u, err := url.Parse(depthURL)
 	if err != nil {
 		return "", err

@@ -64,7 +64,7 @@ func main() {
 
 	poloniexWorker.Start()
 
-	apiServer := api.New(cfg.API, l, database, binanceWorker)
+	apiServer := api.New(cfg.API, l, database, binanceWorker, bittrexWorker, poloniexWorker)
 
 	go func() {
 		if err = apiServer.Start(); err != nil {

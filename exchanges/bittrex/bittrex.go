@@ -56,6 +56,17 @@ func (w *Worker) Start() {
 	}
 }
 
+func (w *Worker) Reload() {
+	for _, symbol := range w.symbols {
+		for _, v := range models.BittrexCandlestickIntervalList {
+			go func(s string) {
+				w.initCandlesticks(symbol, s)
+			}(v)
+		}
+	}
+	w.log.Infof("Bittrex cache reloaded")
+}
+
 func (w *Worker) SubscribeCandlestickAll(symbol string) {
 	for _, v := range models.BittrexCandlestickIntervalList {
 		go func(s string) {
