@@ -176,7 +176,9 @@ func (c *Client) LoadCandlestickListByExchange(exchange, symbol, interval string
 			return nil, fmt.Errorf("could not unmarshal %v: %v", str, err)
 		}
 
-		candleList = append(candleList, ob)
+		if ob.Volume != 0 {
+			candleList = append(candleList, ob)
+		}
 	}
 
 	c.log.Debugf("LoadCandlestickList result: %+v", candleList)
