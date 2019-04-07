@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/batonych/tradingbot/models"
+	"price-feed/models"
 )
 
 const (

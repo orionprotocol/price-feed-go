@@ -12,10 +12,10 @@ import (
 	"time"
 
 	"github.com/adshao/go-binance"
-	"github.com/batonych/tradingbot/logger"
-	"github.com/batonych/tradingbot/models"
-	"github.com/batonych/tradingbot/storage"
 	"github.com/pkg/errors"
+	"price-feed/logger"
+	"price-feed/models"
+	"price-feed/storage"
 )
 
 const (

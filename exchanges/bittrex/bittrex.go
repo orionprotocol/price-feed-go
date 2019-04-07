@@ -6,9 +6,9 @@ import (
 
 	"github.com/toorop/go-bittrex"
 
-	"github.com/batonych/tradingbot/logger"
-	"github.com/batonych/tradingbot/models"
-	"github.com/batonych/tradingbot/storage"
+	"price-feed/logger"
+	"price-feed/models"
+	"price-feed/storage"
 )
 
 type Config struct {

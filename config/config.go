@@ -6,14 +6,14 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/batonych/tradingbot/exchanges/bittrex"
-	"github.com/batonych/tradingbot/exchanges/poloniex"
+	"price-feed/exchanges/bittrex"
+	"price-feed/exchanges/poloniex"
 
-	"github.com/batonych/tradingbot/api"
-	"github.com/batonych/tradingbot/exchanges/binance"
-	"github.com/batonych/tradingbot/logger"
-	"github.com/batonych/tradingbot/storage"
 	"github.com/pkg/errors"
+	"price-feed/api"
+	"price-feed/exchanges/binance"
+	"price-feed/logger"
+	"price-feed/storage"
 )
 
 const (

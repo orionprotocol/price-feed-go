@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/batonych/tradingbot/models"
+	"price-feed/models"
 )
 
 func (api *API) handleCandlestickRequest(w http.ResponseWriter, r *http.Request) {

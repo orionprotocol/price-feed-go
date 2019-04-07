@@ -15,8 +15,8 @@ import (
 
 	"github.com/adshao/go-binance"
 
-	"github.com/batonych/tradingbot/logger"
-	"github.com/batonych/tradingbot/models"
+	"price-feed/logger"
+	"price-feed/models"
 
 	"gopkg.in/redis.v3"
 )

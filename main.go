@@ -5,15 +5,15 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/batonych/tradingbot/exchanges/poloniex"
+	"price-feed/exchanges/poloniex"
 
-	"github.com/batonych/tradingbot/exchanges/bittrex"
+	"price-feed/exchanges/bittrex"
 
-	"github.com/batonych/tradingbot/api"
-	"github.com/batonych/tradingbot/config"
-	"github.com/batonych/tradingbot/exchanges/binance"
-	"github.com/batonych/tradingbot/logger"
-	"github.com/batonych/tradingbot/storage"
+	"price-feed/api"
+	"price-feed/config"
+	"price-feed/exchanges/binance"
+	"price-feed/logger"
+	"price-feed/storage"
 )
 
 func main() {

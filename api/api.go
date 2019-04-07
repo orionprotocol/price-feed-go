@@ -4,12 +4,12 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/batonych/tradingbot/exchanges/binance"
-	"github.com/batonych/tradingbot/exchanges/bittrex"
-	"github.com/batonych/tradingbot/exchanges/poloniex"
-	"github.com/batonych/tradingbot/logger"
-	"github.com/batonych/tradingbot/storage"
 	"github.com/gorilla/mux"
+	"price-feed/exchanges/binance"
+	"price-feed/exchanges/bittrex"
+	"price-feed/exchanges/poloniex"
+	"price-feed/logger"
+	"price-feed/storage"
 )
 
 const (
